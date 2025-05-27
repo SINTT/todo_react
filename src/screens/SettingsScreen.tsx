@@ -140,6 +140,19 @@ const SettingsScreen = ({navigation}: any) => {
 
   return (
     <ScrollView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={{height: 54, width: 54, alignItems: 'center', justifyContent: 'center'}}
+          onPress={() => navigation.goBack()}
+        >
+          <Image
+            source={require('../assets/icons/arrow_back.png')}
+            style={{width: 24, height: 24, tintColor: '#2A2A2A'}}
+          />
+        </TouchableOpacity>
+        <Text bold style={styles.headerTitle}>Настройки</Text>
+      </View>
+
       <View style={styles.profileImageContainer}>
         <TouchableOpacity onPress={handleImagePick} disabled={imageLoading}>
           {profileImage && !imageError ? (
@@ -264,6 +277,29 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 24,
     backgroundColor: '#ffffff',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 24,
+    marginBottom: 20,
+  },
+  backButton: {
+    width: 54,
+    height: 54,
+    backgroundColor: '#F3F6FB',
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backIcon: {
+    width: 24,
+    height: 24,
+    tintColor: '#2A2A2A',
+  },
+  headerTitle: {
+    fontSize: 24,
+    color: '#2A2A2A',
   },
   sectionTitle: {
     fontSize: 18,

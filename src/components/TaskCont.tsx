@@ -20,6 +20,7 @@ interface TaskProps {
     creator_first_name: string;
     creator_last_name: string;
     creator_profile_image: string | null;
+    subtasks: Array<{ status: string }>;
   };
   onPress: () => void;
 }
@@ -34,8 +35,18 @@ const TaskCont: React.FC<TaskProps> = ({ task, onPress }) => {
     });
   };
 
+  const completedSubtasks = task.subtasks.filter(st => st.status === 'completed').length;
+  const totalSubtasks = task.subtasks.length;
+  const isCompleted = task.status === 'completed';
+
   return (
-    <TouchableOpacity style={styles.container} onPress={onPress}>
+    <TouchableOpacity
+      style={[
+        styles.container,
+        isCompleted && styles.completedContainer
+      ]}
+      onPress={onPress}
+    >
       <View style={styles.header}>
         <View style={styles.creatorInfo}>
           <Image
@@ -50,11 +61,37 @@ const TaskCont: React.FC<TaskProps> = ({ task, onPress }) => {
             {`${task.creator_first_name} ${task.creator_last_name}`}
           </Text>
         </View>
-        <Text style={styles.reward}>🏆 {task.reward_points}</Text>
+        <Text style={[styles.reward, isCompleted && styles.completedText]}>
+          🏆 {task.reward_points}
+        </Text>
       </View>
 
-      <Text semiBold style={styles.title}>{task.task_title}</Text>
+      <Text semiBold style={[styles.title, isCompleted && styles.completedText]}>{task.task_title}</Text>
       <Text style={styles.description}>{task.task_description}</Text>
+
+      <View style={styles.progressContainer}>
+        <Text 
+          style={[
+            styles.progressText,
+            isCompleted && styles.completedText
+          ]}
+        >
+          {isCompleted 
+            ? 'Завершено' 
+            : `Выполнено ${completedSubtasks} из ${totalSubtasks}`
+          }
+        </Text>
+        {!isCompleted && (
+          <View style={styles.progressBar}>
+            <View 
+              style={[
+                styles.progressFill,
+                { width: `${(completedSubtasks / totalSubtasks) * 100}%` }
+              ]} 
+            />
+          </View>
+        )}
+      </View>
 
       <View style={styles.footer}>
         <Text style={styles.dates}>
@@ -93,6 +130,10 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 10,
   },
+  completedContainer: {
+    backgroundColor: '#E8F5E9',
+    opacity: 0.8,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -119,9 +160,29 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#2A2A2A',
   },
+  completedText: {
+    color: '#4CAF50',
+  },
   description: {
     fontSize: 14,
     color: '#666666',
+  },
+  progressContainer: {
+    gap: 4,
+  },
+  progressText: {
+    fontSize: 14,
+    color: '#666666',
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: '#F3F6FB',
+    borderRadius: 2,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#2A2A2A',
+    borderRadius: 2,
   },
   footer: {
     flexDirection: 'row',

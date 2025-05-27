@@ -1089,13 +1089,50 @@ app.post('/api/tasks/:taskId/subtasks/:subtaskId/complete', async (req, res) => 
   }
 });
 
+// Toggle subtask status
+app.post('/api/tasks/:taskId/subtasks/:subtaskId/toggle', async (req, res) => {
+  const { taskId, subtaskId } = req.params;
+  const { status } = req.body;
+  
+  try {
+    // Check if task is in progress
+    const taskCheck = await pool.query(
+      'SELECT status FROM Tasks WHERE task_id = $1',
+      [taskId]
+    );
+    
+    if (taskCheck.rows[0]?.status !== 'in_progress') {
+      return res.status(400).json({
+        success: false,
+        error: 'Task must be in progress to modify subtasks'
+      });
+    }
+
+    await pool.query(
+      'UPDATE Subtasks SET status = $1 WHERE subtask_id = $2 AND task_id = $3',
+      [status, subtaskId, taskId]
+    );
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error toggling subtask:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error toggling subtask'
+    });
+  }
+});
+
 // Complete task
 app.post('/api/tasks/:taskId/complete', async (req, res) => {
   const { taskId } = req.params;
+  const client = await pool.connect();
   
   try {
+    await client.query('BEGIN');
+
     // Check if all subtasks are completed
-    const subtasks = await pool.query(
+    const subtasks = await client.query(
       'SELECT status FROM Subtasks WHERE task_id = $1',
       [taskId]
     );
@@ -1109,18 +1146,101 @@ app.post('/api/tasks/:taskId/complete', async (req, res) => {
       });
     }
 
-    await pool.query(
+    // Get task details including reward points
+    const taskDetails = await client.query(
+      'SELECT reward_points FROM Tasks WHERE task_id = $1',
+      [taskId]
+    );
+
+    const rewardPoints = taskDetails.rows[0].reward_points;
+
+    // Get all performers for this task
+    const performers = await client.query(
+      'SELECT performer_id FROM Performers WHERE task_id = $1',
+      [taskId]
+    );
+
+    // Update cups for each performer
+    for (const performer of performers.rows) {
+      await client.query(
+        `UPDATE "User" 
+         SET full_cup_count = full_cup_count + $1,
+             now_cup_count = now_cup_count + $1
+         WHERE user_id = $2`,
+        [rewardPoints, performer.performer_id]
+      );
+
+      // Check if user reached their purpose
+      const userCups = await client.query(
+        `SELECT now_cup_count, purpose_cup_count 
+         FROM "User" 
+         WHERE user_id = $1`,
+        [performer.performer_id]
+      );
+
+      // If reached or exceeded purpose, reset now_cup_count
+      if (userCups.rows[0].now_cup_count >= userCups.rows[0].purpose_cup_count && 
+          userCups.rows[0].purpose_cup_count > 0) {
+        await client.query(
+          `UPDATE "User" 
+           SET now_cup_count = 0
+           WHERE user_id = $1`,
+          [performer.performer_id]
+        );
+      }
+    }
+
+    // Mark task as completed
+    await client.query(
       'UPDATE Tasks SET status = $1 WHERE task_id = $2',
       ['completed', taskId]
     );
     
+    await client.query('COMMIT');
     res.json({ success: true });
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Error completing task:', error);
     res.status(500).json({
       success: false,
       error: 'Error completing task'
     });
+  } finally {
+    client.release();
+  }
+});
+
+// Delete task
+app.delete('/api/tasks/:taskId', async (req, res) => {
+  const { taskId } = req.params;
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+
+    // Delete subtasks
+    await client.query('DELETE FROM Subtasks WHERE task_id = $1', [taskId]);
+    
+    // Delete performers
+    await client.query('DELETE FROM Performers WHERE task_id = $1', [taskId]);
+    
+    // Delete images
+    await client.query('DELETE FROM TaskImages WHERE task_id = $1', [taskId]);
+    
+    // Delete task
+    await client.query('DELETE FROM Tasks WHERE task_id = $1', [taskId]);
+    
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error deleting task:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка при удалении задания'
+    });
+  } finally {
+    client.release();
   }
 });
 

@@ -53,7 +53,7 @@ CREATE TABLE Tasks (
     finish_date TIMESTAMP,
     task_creater_id INT,
     priority VARCHAR(50) CHECK (priority IN ('low', 'medium', 'high')),
-    status VARCHAR(50) CHECK (status IN ('open', 'in progress', 'completed')),
+    status VARCHAR(50) CHECK (status IN ('open', 'in_progress', 'completed')), -- исправлено здесь
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP
 );

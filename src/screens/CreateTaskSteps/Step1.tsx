@@ -36,13 +36,20 @@ export const Step1: React.FC<Step1Props> = ({
   const handleImagePick = async () => {
     launchImageLibrary({
       mediaType: 'photo',
-      selectionLimit: 1,
+      selectionLimit: 0, // 0 means unlimited selection
       quality: 0.8,
     }, async (response: ImagePickerResponse) => {
-      if (response.assets && response.assets.length > 0 && response.assets[0].uri) {
-        const uri = response.assets[0].uri;
-        const base64 = await RNFS.readFile(uri, 'base64');
-        setImages(prev => [...prev, `data:image/jpeg;base64,${base64}`]);
+      if (response.assets && response.assets.length > 0) {
+        const newImages = await Promise.all(
+          response.assets.map(async (asset) => {
+            if (asset.uri) {
+              const base64 = await RNFS.readFile(asset.uri, 'base64');
+              return `data:image/jpeg;base64,${base64}`;
+            }
+            return null;
+          })
+        );
+        setImages(prev => [...prev, ...newImages.filter(Boolean) as string[]]);
       }
     });
   };

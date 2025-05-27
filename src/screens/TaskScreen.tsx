@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, StatusBar } from 'react-native';
+import { View, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, StatusBar, Switch } from 'react-native';
 import { Text } from '../components/CustomText';
 import { api } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ImageViewerModal } from '../components/ImageViewer';
 
 interface SubTask {
   subtask_id: number;
   title: string;
   description: string;
   status: string;
+  created_at: string; // Add this for sorting
 }
 
 interface TaskDetails {
@@ -38,12 +40,33 @@ const TaskScreen = ({ route, navigation }: any) => {
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<number | null>(null);
   const [canStart, setCanStart] = useState(false);
-  const [currentSubtaskIndex, setCurrentSubtaskIndex] = useState(0);
+  const [currentSubtaskIndex, setCurrentSubtaskIndex] = useState<number | null>(null);
+  const [allSubtasksCompleted, setAllSubtasksCompleted] = useState(false);
+  const [isCreator, setIsCreator] = useState(false);
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
   useEffect(() => {
     loadUserData();
-    fetchTaskDetails();
   }, []);
+
+  useEffect(() => {
+    if (userId) {
+      fetchTaskDetails();
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    if (task) {
+      // Check if all subtasks are completed
+      const completed = task.subtasks.every(st => st.status === 'completed');
+      setAllSubtasksCompleted(completed);
+
+      // Find first incomplete subtask
+      const firstIncompleteIndex = task.subtasks.findIndex(st => st.status !== 'completed');
+      setCurrentSubtaskIndex(firstIncompleteIndex === -1 ? null : firstIncompleteIndex);
+    }
+  }, [task]);
 
   const loadUserData = async () => {
     const userDataStr = await AsyncStorage.getItem('userToken');
@@ -59,6 +82,7 @@ const TaskScreen = ({ route, navigation }: any) => {
       if (response.data.success) {
         setTask(response.data.task);
         checkCanStart(response.data.task);
+        setIsCreator(response.data.task.task_creater_id === userId);
       }
     } catch (error) {
       console.error('Error fetching task details:', error);
@@ -67,39 +91,36 @@ const TaskScreen = ({ route, navigation }: any) => {
     }
   };
 
+  // Replace checkCanStart function
   const checkCanStart = (taskData: TaskDetails) => {
     if (!userId) return;
     const isPerformer = taskData.performers.some(p => p.user_id === userId);
-    setCanStart(isPerformer && taskData.status === 'open');
+    const canStartTask = isPerformer && taskData.status === 'open';
+    setCanStart(canStartTask);
   };
 
-  const startTask = async () => {
+  // Replace toggleSubtask function
+  const toggleSubtask = async (subtaskId: number, newStatus: string) => {
     try {
-      const response = await api.post(`/api/tasks/${taskId}/start`);
+      const response = await api.post(`/api/tasks/${taskId}/subtasks/${subtaskId}/toggle`, {
+        status: newStatus
+      });
+      
       if (response.data.success) {
-        fetchTaskDetails();
+        await fetchTaskDetails();
       }
     } catch (error) {
-      console.error('Error starting task:', error);
+      console.error('Error toggling subtask:', error);
     }
   };
 
-  const completeSubtask = async (subtaskId: number) => {
-    try {
-      const response = await api.post(`/api/tasks/${taskId}/subtasks/${subtaskId}/complete`);
-      if (response.data.success) {
-        fetchTaskDetails();
-        // Переходим к следующей подзадаче, если есть
-        if (task && currentSubtaskIndex < task.subtasks.length - 1) {
-          setCurrentSubtaskIndex(currentSubtaskIndex + 1);
-        }
-      }
-    } catch (error) {
-      console.error('Error completing subtask:', error);
-    }
-  };
-
+  // Replace completeTask function
   const completeTask = async () => {
+    if (!allSubtasksCompleted) {
+      // Show error message
+      return;
+    }
+
     try {
       const response = await api.post(`/api/tasks/${taskId}/complete`);
       if (response.data.success) {
@@ -108,6 +129,34 @@ const TaskScreen = ({ route, navigation }: any) => {
     } catch (error) {
       console.error('Error completing task:', error);
     }
+  };
+
+  const startTask = async () => {
+    try {
+      const response = await api.post(`/api/tasks/${taskId}/start`);
+      if (response.data.success) {
+        await fetchTaskDetails();
+      }
+    } catch (error) {
+      console.error('Error starting task:', error);
+    }
+  };
+
+  const deleteTask = async () => {
+    try {
+      const response = await api.delete(`/api/tasks/${taskId}`);
+      if (response.data.success) {
+        navigation.goBack();
+      }
+    } catch (error) {
+      console.error('Error deleting task:', error);
+    }
+  };
+
+  // Add sorted subtasks getter
+  const getSortedSubtasks = () => {
+    if (!task) return [];
+    return [...task.subtasks].sort((a, b) => a.subtask_id - b.subtask_id);
   };
 
   const formatDate = (dateString: string) => {
@@ -164,20 +213,36 @@ const TaskScreen = ({ route, navigation }: any) => {
           
           {/* Images */}
           {task.images && task.images.length > 0 && (
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              style={styles.imagesContainer}
-            >
-              {task.images.map((imageUrl, index) => (
-                <Image
-                  key={index}
-                  source={{ uri: imageUrl }}
-                  style={styles.taskImage}
-                  resizeMode="cover"
-                />
-              ))}
-            </ScrollView>
+            <>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                style={styles.imagesContainer}
+              >
+                {task.images.map((imageUrl, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    onPress={() => {
+                      setSelectedImageIndex(index);
+                      setImageViewerVisible(true);
+                    }}
+                  >
+                    <Image
+                      source={{ uri: imageUrl }}
+                      style={styles.taskImage}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <ImageViewerModal
+                images={task.images}
+                visible={imageViewerVisible}
+                initialIndex={selectedImageIndex}
+                onClose={() => setImageViewerVisible(false)}
+              />
+            </>
           )}
 
           <View style={styles.dateInfo}>
@@ -202,12 +267,12 @@ const TaskScreen = ({ route, navigation }: any) => {
           </View>
         </View>
 
-        {/* Subtasks */}
+        {/* Subtasks section */}
         <View style={styles.subtasksBlock}>
           <Text semiBold style={styles.blockTitle}>Подзадачи:</Text>
-          {task.subtasks.map((subtask, index) => (
+          {getSortedSubtasks().map((subtask, index) => (
             <View 
-              key={subtask.subtask_id} 
+              key={subtask.subtask_id}
               style={[
                 styles.subtaskItem,
                 subtask.status === 'completed' && styles.subtaskCompleted,
@@ -216,30 +281,26 @@ const TaskScreen = ({ route, navigation }: any) => {
             >
               <View style={styles.subtaskHeader}>
                 <Text semiBold style={styles.subtaskTitle}>{subtask.title}</Text>
-                {subtask.status === 'completed' && (
-                  <Image
-                    source={require('../assets/icons/plus2.png')}
-                    style={styles.checkIcon}
+                {task.status === 'in_progress' && (
+                  <Switch
+                    trackColor={{ false: '#767577', true: '#81b0ff' }}
+                    thumbColor={subtask.status === 'completed' ? '#4CAF50' : '#f4f3f4'}
+                    ios_backgroundColor="#3e3e3e"
+                    onValueChange={() => toggleSubtask(
+                      subtask.subtask_id, 
+                      subtask.status === 'completed' ? 'pending' : 'completed'
+                    )}
+                    value={subtask.status === 'completed'}
                   />
                 )}
               </View>
               <Text style={styles.subtaskDescription}>{subtask.description}</Text>
-              {index === currentSubtaskIndex && 
-               task.status === 'in_progress' && 
-               subtask.status !== 'completed' && (
-                <TouchableOpacity 
-                  style={styles.completeButton}
-                  onPress={() => completeSubtask(subtask.subtask_id)}
-                >
-                  <Text style={styles.completeButtonText}>Завершить подзадачу</Text>
-                </TouchableOpacity>
-              )}
             </View>
           ))}
         </View>
 
         {/* Action Buttons */}
-        {canStart && (
+        {canStart && task.status === 'open' && (
           <TouchableOpacity 
             style={styles.actionButton}
             onPress={startTask}
@@ -248,14 +309,31 @@ const TaskScreen = ({ route, navigation }: any) => {
           </TouchableOpacity>
         )}
 
-        {task.status === 'in_progress' && 
-         currentSubtaskIndex === task.subtasks.length - 1 &&
-         task.subtasks[currentSubtaskIndex].status === 'completed' && (
+        {task.status === 'in_progress' && (
           <TouchableOpacity 
-            style={[styles.actionButton, styles.completeTaskButton]}
+            style={[
+              styles.actionButton, 
+              styles.completeTaskButton,
+              !allSubtasksCompleted && styles.actionButtonDisabled
+            ]}
             onPress={completeTask}
+            disabled={!allSubtasksCompleted}
           >
-            <Text semiBold style={styles.actionButtonText}>Завершить задание</Text>
+            <Text semiBold style={styles.actionButtonText}>
+              {allSubtasksCompleted 
+                ? 'Завершить задание' 
+                : 'Завершите все подзадачи'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Delete Button for creator */}
+        {isCreator && task.status !== 'completed' && (
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.deleteButton]}
+            onPress={deleteTask}
+          >
+            <Text semiBold style={styles.actionButtonText}>Удалить задание</Text>
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -384,28 +462,33 @@ const styles = StyleSheet.create({
   },
   subtaskTitle: {
     fontSize: 16,
-  },
-  checkIcon: {
-    width: 20,
-    height: 20,
-    tintColor: '#4CAF50',
+    flex: 1,
+    marginRight: 10,
   },
   subtaskDescription: {
     color: '#666666',
   },
   actionButton: {
+    height: 56,
     backgroundColor: '#2A2A2A',
     borderRadius: 25,
-    padding: 20,
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 20,
   },
   completeTaskButton: {
     backgroundColor: '#4CAF50',
   },
+  deleteButton: {
+    backgroundColor: '#FF5252',
+  },
   actionButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
+  },
+  actionButtonDisabled: {
+    opacity: 0.5,
+    backgroundColor: '#999',
   },
   completeButton: {
     backgroundColor: '#2A2A2A',

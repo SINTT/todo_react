@@ -85,14 +85,6 @@ const CreateTaskScreen = ({ navigation }: any) => {
         setIsSubmitting(true);
 
         try {
-            // Upload images first if any
-            const uploadedImageUrls = await Promise.all(
-                images.map(async (image) => {
-                    const response = await api.put(`/api/upload-image`, { image });
-                    return response.data.secure_url;
-                })
-            );
-
             const taskData = {
                 title,
                 description,
@@ -103,7 +95,7 @@ const CreateTaskScreen = ({ navigation }: any) => {
                 start_date: startDate,
                 finish_date: endDate,
                 reward_points: parseInt(reward),
-                images: uploadedImageUrls
+                images // Передаем base64 строки напрямую
             };
 
             const response = await api.post('/api/tasks', taskData);

@@ -114,10 +114,12 @@ const HomeScreen = ({navigation}: any) => {
 
       if (response.data.success) {
         const taskList = response.data.tasks || [];
-        // Сортируем задания по дате создания (сначала новые)
-        const sortedTasks = taskList.sort((a: Task, b: Task) => 
-          new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
-        );
+        // Сортируем задания: сначала активные (новые и в процессе), потом завершенные
+        const sortedTasks = taskList.sort((a: Task, b: Task) => {
+          if (a.status === 'completed' && b.status !== 'completed') return 1;
+          if (a.status !== 'completed' && b.status === 'completed') return -1;
+          return new Date(b.start_date).getTime() - new Date(a.start_date).getTime();
+        });
         setTasks(sortedTasks);
       }
     } catch (error) {
