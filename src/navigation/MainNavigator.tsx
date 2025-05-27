@@ -12,6 +12,8 @@ import OtherProfileScreen from '../screens/OtherProfileScreen';
 import OrganizationProfileScreen from '../screens/OrganizationProfileScreen';
 import CreateOrganizationScreen from '../screens/CreateOrganizationScreen';
 import OrganizationSettingsScreen from '../screens/OrganizationSettingsScreen';
+import SettingsScreen from '../screens/SettingsScreen';
+import ChatScreen from '../screens/ChatScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -21,6 +23,9 @@ const MainStack = () => {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="MainTabs" component={MainTabs} />
       <Stack.Screen name="OtherProfile" component={OtherProfileScreen} />
+      <Stack.Screen name="Profile" component={ProfileScreen} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="ChatScreen" component={ChatScreen} />
       <Stack.Screen name="OrganizationProfile" component={OrganizationProfileScreen} />
       <Stack.Screen name="CreateOrganization" component={CreateOrganizationScreen} />
       <Stack.Screen name="OrganizationSettings" component={OrganizationSettingsScreen} />
@@ -92,6 +97,7 @@ const MainTabs = () => {
         name="Сообщения"
         component={MessagesScreen}
         options={{
+          headerShown: false,
           tabBarLabel: () => null,
           tabBarIcon: ({ color }) => (
             <Image

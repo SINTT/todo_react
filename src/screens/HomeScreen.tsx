@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Image, TouchableOpacity, StatusBar, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, StyleSheet, Image, TouchableOpacity, StatusBar, ScrollView, ActivityIndicator, RefreshControl, LayoutRectangle } from 'react-native';
 import { Text } from '../components/CustomText';
 import DatePicker from '../components/DatePicker';
 import TaskCont from '../components/TaskCont';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../config/api';
+import AvatarMenu from '../components/AvatarMenu';
 
 // Обновляем интерфейс Task чтобы он соответствовал данным с сервера
 interface Task {
@@ -46,6 +47,8 @@ const HomeScreen = ({navigation}: any) => {
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const [avatarPosition, setAvatarPosition] = useState({ x: 0, y: 0 });
 
   const periodTitles = {
     yesterday: 'Вчера:',
@@ -142,6 +145,26 @@ const HomeScreen = ({navigation}: any) => {
     setSelectedPeriod('period');
   };
 
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem('userToken');
+      await AsyncStorage.removeItem('isLoggedIn');
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Auth' }],
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
+  const measureAvatarPosition = (event: LayoutRectangle) => {
+    setAvatarPosition({
+      x: event.x,
+      y: event.y
+    });
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="gray" />
@@ -149,27 +172,45 @@ const HomeScreen = ({navigation}: any) => {
         <Text bold style={styles.headerTitle}>Главная</Text>
 
         <View style={{gap: 14, flexDirection: 'row'}}>
-          <TouchableOpacity style={styles.bellButton}>
+          <TouchableOpacity style={styles.bellButton} onPress={() => navigation.navigate('NotificationsScreen')}>
             <Image 
               source={require('../assets/icons/bell_ico.png')}
               style={styles.bellIcon}
             />
           </TouchableOpacity>
 
-          <TouchableOpacity style={{borderRadius: 24, borderColor: 'black', borderWidth: 3}}>
+          <TouchableOpacity 
+            style={{borderRadius: 24, borderColor: 'black', borderWidth: 3}}
+            onPress={() => setIsMenuVisible(true)}
+            onLayout={(event) => measureAvatarPosition(event.nativeEvent.layout)}
+          >
             <Image 
               source={
                 profileImage && !imageError
                   ? { uri: profileImage }
-                  : require('../assets/images/avatar.png')
+                  : require('../assets/images/avatar.jpg')
               }
               style={{borderRadius: 24, width: 44, height: 44, borderColor: 'white', borderWidth: 2}}
               onError={() => setImageError(true)}
             />
           </TouchableOpacity>
         </View>
-
       </View>
+
+      <AvatarMenu 
+        visible={isMenuVisible}
+        onClose={() => setIsMenuVisible(false)}
+        onProfilePress={() => {
+          setIsMenuVisible(false);
+          navigation.navigate('MainTabs', { screen: 'Профиль' });
+        }}
+        onSettingsPress={() => {
+          setIsMenuVisible(false);
+          navigation.navigate('Settings');
+        }}
+        onLogoutPress={handleLogout}
+        avatarPosition={avatarPosition}
+      />
 
       {/* Period buttons */}
       <View style={styles.periodScrollViewContainer}>

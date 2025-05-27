@@ -66,7 +66,8 @@ CREATE TABLE Chat (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     creator_id INT,
     is_group_chat BOOLEAN DEFAULT FALSE,
-    last_message_id INT
+    last_message_id INT,
+    is_active BOOLEAN DEFAULT true -- Добавлено поле is_active
 );
 
 CREATE TABLE Messages (
@@ -486,3 +487,28 @@ BEGIN
     RETURN v_task_id;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Добавление таблицы участников чата
+CREATE TABLE ChatMembers (
+    member_id SERIAL PRIMARY KEY,
+    chat_id INT,
+    user_id INT,
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (chat_id) REFERENCES Chat(chat_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES "User"(user_id) ON DELETE CASCADE
+);
+
+-- Создание уникального ограничения, чтобы предотвратить дубликаты участников
+ALTER TABLE ChatMembers
+ADD CONSTRAINT unique_chat_member UNIQUE (chat_id, user_id);
+
+-- Таблица для изображений в сообщениях
+CREATE TABLE MessageImages (
+    image_id SERIAL PRIMARY KEY,
+    chat_id INT,
+    sender_id INT,
+    image_url VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (chat_id) REFERENCES Chat(chat_id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_id) REFERENCES "User"(user_id)
+);

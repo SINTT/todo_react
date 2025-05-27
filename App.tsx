@@ -13,6 +13,8 @@ import OrganizationSettingsScreen from './src/screens/OrganizationSettingsScreen
 import RequestionsOrganizationScreen from './src/screens/RequestionsOrganizationScreen';
 import ParticipantsOrganizationScreen from './src/screens/ParticipantsOrganizationScreen';
 import TaskScreen from './src/screens/TaskScreen';
+import ChatScreen from './src/screens/ChatScreen';
+import NotificationsScreen from './src/screens/NotificationsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -32,6 +34,8 @@ function App(): React.JSX.Element {
         <Stack.Screen name="RequestionsOrganization" component={RequestionsOrganizationScreen} />
         <Stack.Screen name="ParticipantsOrganization" component={ParticipantsOrganizationScreen} />
         <Stack.Screen name="Task" component={TaskScreen} />
+        <Stack.Screen name="ChatScreen" component={ChatScreen} />
+        <Stack.Screen name="NotificationsScreen" component={NotificationsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

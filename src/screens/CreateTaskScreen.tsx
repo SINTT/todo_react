@@ -98,7 +98,9 @@ const CreateTaskScreen = ({ navigation }: any) => {
                 images // Передаем base64 строки напрямую
             };
 
-            const response = await api.post('/api/tasks', taskData);
+            const response = await api.post('/api/tasks', taskData, {
+                timeout: 30000, // можно указать timeout для конкретного запроса
+            });
 
             if (response.data.success) {
                 navigation.goBack();

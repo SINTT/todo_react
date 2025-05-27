@@ -164,11 +164,12 @@ const OrganizationSettingsScreen = ({ navigation }: OrganizationSettingsScreenPr
             style={styles.backIcon}
           />
         </TouchableOpacity>
-        <Text semiBold style={styles.headerTitle}>Настройки организации</Text>
+        <Text bold style={styles.headerTitle}>Организация</Text>
+        <View style={styles.backButton}/>
       </View>
 
       <ScrollView style={styles.content}>
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputContainer, { marginBottom: 10 }]}>
           <TextInput
             style={styles.input}
             placeholder=""
@@ -178,9 +179,9 @@ const OrganizationSettingsScreen = ({ navigation }: OrganizationSettingsScreenPr
           <Text style={styles.label}>Название организации</Text>
         </View>
 
-        <View style={[styles.inputContainer, { height: 120 }]}>
+        <View style={[styles.inputContainer, { marginBottom: 10 }]}>
           <TextInput
-            style={[styles.input, { height: 120, paddingTop: 32 }]}
+            style={[styles.input, { paddingTop: 32 }]}
             placeholder=""
             multiline
             value={formData.description}
@@ -190,7 +191,7 @@ const OrganizationSettingsScreen = ({ navigation }: OrganizationSettingsScreenPr
           <Text style={styles.label}>Описание организации</Text>
         </View>
 
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputContainer, { marginBottom: 10 }]}>
           <TextInput
             style={styles.input}
             placeholder=""
@@ -201,7 +202,7 @@ const OrganizationSettingsScreen = ({ navigation }: OrganizationSettingsScreenPr
         </View>
 
         {adminUser && (
-          <View style={styles.adminBlock}>
+          <View style={[styles.adminBlock, { marginBottom: 10 }]}>
             <Text style={styles.adminLabel}>Администратор:</Text>
             <View style={styles.adminInfo}>
               <Image
@@ -215,9 +216,9 @@ const OrganizationSettingsScreen = ({ navigation }: OrganizationSettingsScreenPr
           </View>
         )}
 
-        <View style={styles.buttonGroup}>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
           <TouchableOpacity
-            style={styles.actionButton}
+            style={[styles.actionButton, { marginBottom: 10 }]}
             onPress={() => navigation.navigate('RequestionsOrganization')}
           >
             <Image
@@ -230,7 +231,7 @@ const OrganizationSettingsScreen = ({ navigation }: OrganizationSettingsScreenPr
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.actionButton}
+            style={[styles.actionButton, { marginBottom: 10 }]}
             onPress={() => navigation.navigate('ParticipantsOrganization')}
           >
             <Image
@@ -238,13 +239,14 @@ const OrganizationSettingsScreen = ({ navigation }: OrganizationSettingsScreenPr
               style={styles.actionIcon}
             />
             <Text semiBold style={styles.actionButtonText}>
-              Список участников
+              Участники
             </Text>
           </TouchableOpacity>
         </View>
+   
 
         <TouchableOpacity
-          style={styles.saveButton}
+          style={[styles.saveButton, { marginBottom: 10 }]}
           onPress={handleSave}
           disabled={loading}
         >
@@ -255,7 +257,7 @@ const OrganizationSettingsScreen = ({ navigation }: OrganizationSettingsScreenPr
 
         {userRole === 'Manager' ? (
           <TouchableOpacity
-            style={[styles.deleteButton, styles.leaveButton]}
+            style={[styles.deleteButton, styles.leaveButton, { marginBottom: 10 }]}
             onPress={() => handleLeave()}
           >
             <Text semiBold style={styles.deleteButtonText}>
@@ -264,7 +266,7 @@ const OrganizationSettingsScreen = ({ navigation }: OrganizationSettingsScreenPr
           </TouchableOpacity>
         ) : userRole === 'Admin' && (
           <TouchableOpacity
-            style={styles.deleteButton}
+            style={[styles.deleteButton, { marginBottom: 10 }]}
             onPress={handleDelete}
           >
             <Text semiBold style={styles.deleteButtonText}>
@@ -285,34 +287,36 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 24,
-    padding: 24,
+    height: 78,
+    paddingHorizontal: 10,
+    backgroundColor: '#FFFFFF',
     marginTop: StatusBar.currentHeight,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
   },
   backButton: {
     width: 54,
     height: 54,
-    backgroundColor: '#F3F6FB',
-    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
   backIcon: {
-    width: 24,
-    height: 24,
+    width: 54,
+    height: 54,
     tintColor: '#2A2A2A',
   },
   headerTitle: {
     fontSize: 24,
     color: '#2A2A2A',
-  },
-  content: {
+  },  content: {
     flex: 1,
-    padding: 24,
+    padding: 20,
+    gap: 10, // Добавляем gap для ScrollView
   },
   inputContainer: {
     height: 56,
-    marginBottom: 16,
     position: 'relative',
   },
   label: {
@@ -337,17 +341,15 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#F3F6FB',
     borderRadius: 25,
-    marginBottom: 20,
   },
   adminLabel: {
     fontSize: 14,
     color: '#666666',
-    marginBottom: 10,
   },
   adminInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
   adminAvatar: {
     width: 40,
@@ -358,11 +360,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#2A2A2A',
   },
-  buttonGroup: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 20,
-  },
+
   actionButton: {
     flex: 1,
     height: 56,
@@ -388,7 +386,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
   },
   saveButtonText: {
     color: '#ffffff',
@@ -400,7 +397,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 10, // Изменено с 40 на 10
   },
   deleteButtonText: {
     color: '#FF3B30',

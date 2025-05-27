@@ -53,7 +53,7 @@ const TaskCont: React.FC<TaskProps> = ({ task, onPress }) => {
             source={
               task.creator_profile_image
                 ? { uri: task.creator_profile_image }
-                : require('../assets/images/avatar.png')
+                : require('../assets/images/avatar.jpg')
             }
             style={styles.creatorAvatar}
           />
@@ -104,7 +104,7 @@ const TaskCont: React.FC<TaskProps> = ({ task, onPress }) => {
               source={
                 performer.profile_image
                   ? { uri: performer.profile_image }
-                  : require('../assets/images/avatar.png')
+                  : require('../assets/images/avatar.jpg')
               }
               style={[
                 styles.performerAvatar,

@@ -5,7 +5,8 @@ const cloudinary = require('cloudinary').v2;
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({limit: '50mb'}));
+app.use(express.urlencoded({limit: '50mb', extended: true}));
 
 const pool = new Pool({
   user: 'postgres',
@@ -758,11 +759,51 @@ app.post('/api/tasks', async (req, res) => {
 
     const taskId = taskResult.rows[0].task_id;
 
+    // Create chat for task
+    const chatResult = await client.query(
+      `INSERT INTO Chat (
+        chat_name,
+        task_id,
+        creator_id,
+        is_group_chat,
+        is_active
+      ) VALUES ($1, $2, $3, $4, $5) RETURNING chat_id`,
+      [`Task: ${title}`, taskId, creator_id, true, true]
+    );
+
+    const chatId = chatResult.rows[0].chat_id;
+
     // Add performers
     for (const performerId of performers) {
+      const existingMember = await client.query(
+        'SELECT 1 FROM ChatMembers WHERE chat_id = $1 AND user_id = $2',
+        [chatId, performerId]
+      );
+
+      if (existingMember.rows.length === 0) {
+        await client.query(
+          'INSERT INTO ChatMembers (chat_id, user_id) VALUES ($1, $2)',
+          [chatId, performerId]
+        );
+      }
+
+      // Add performer to Performers table
       await client.query(
-        'INSERT INTO Performers (performer_id, task_id) VALUES ($1, $2)',
-        [performerId, taskId]
+        'INSERT INTO Performers (task_id, performer_id) VALUES ($1, $2)',
+        [taskId, performerId]
+      );
+    }
+
+    // Add creator to chat members (but not as a performer)
+    const existingCreator = await client.query(
+      'SELECT 1 FROM ChatMembers WHERE chat_id = $1 AND user_id = $2',
+      [chatId, creator_id]
+    );
+
+    if (existingCreator.rows.length === 0) {
+      await client.query(
+        'INSERT INTO ChatMembers (chat_id, user_id) VALUES ($1, $2)',
+        [chatId, creator_id]
       );
     }
 
@@ -795,7 +836,8 @@ app.post('/api/tasks', async (req, res) => {
     
     res.json({ 
       success: true, 
-      task_id: taskId 
+      task_id: taskId,
+      chat_id: chatId 
     });
   } catch (error) {
     await client.query('ROLLBACK');
@@ -1013,9 +1055,12 @@ app.get('/api/tasks/:taskId', async (req, res) => {
                 'profile_image', u.profile_image
               )
             )
-            FROM Performers p2
-            JOIN "User" u ON p2.performer_id = u.user_id
-            WHERE p2.task_id = t.task_id
+            FROM (
+              SELECT performer_id AS user_id FROM Performers WHERE task_id = t.task_id
+              UNION
+              SELECT task_creater_id AS user_id FROM Tasks WHERE task_id = t.task_id
+            ) p
+            JOIN "User" u ON p.user_id = u.user_id
           ),
           '[]'::json
         ) as performers,
@@ -1190,6 +1235,12 @@ app.post('/api/tasks/:taskId/complete', async (req, res) => {
       }
     }
 
+    // Deactivate task chat
+    await client.query(
+      'UPDATE Chat SET is_active = false WHERE task_id = $1',
+      [taskId]
+    );
+
     // Mark task as completed
     await client.query(
       'UPDATE Tasks SET status = $1 WHERE task_id = $2',
@@ -1218,6 +1269,9 @@ app.delete('/api/tasks/:taskId', async (req, res) => {
   try {
     await client.query('BEGIN');
 
+    // Delete associated chats
+    await client.query('DELETE FROM Chat WHERE task_id = $1', [taskId]);
+
     // Delete subtasks
     await client.query('DELETE FROM Subtasks WHERE task_id = $1', [taskId]);
     
@@ -1238,6 +1292,359 @@ app.delete('/api/tasks/:taskId', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Ошибка при удалении задания'
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// Get user's chats
+app.get('/api/chats/user/:userId', async (req, res) => {
+  const { userId } = req.params;
+  
+  try {
+    const query = `
+      SELECT 
+        c.*,
+        COALESCE(
+          (
+            SELECT json_build_object(
+              'message_text', m.message_text,
+              'date', m.date,
+              'sender_name', CONCAT(u2.first_name, ' ', u2.last_name)
+            )
+            FROM Messages m
+            LEFT JOIN "User" u2 ON m.sender_id = u2.user_id
+            WHERE m.chat_id = c.chat_id
+            ORDER BY m.date DESC
+            LIMIT 1
+          ),
+          null
+        ) as last_message,
+        (
+          SELECT COUNT(*)
+          FROM Messages m
+          WHERE m.chat_id = c.chat_id
+          AND m.is_read = false
+          AND m.sender_id != $1
+        ) as unread_count,
+        COALESCE(
+          (
+            SELECT json_agg(
+              json_build_object(
+                'user_id', u.user_id,
+                'first_name', u.first_name,
+                'last_name', u.last_name,
+                'profile_image', COALESCE(u.profile_image, '')
+              )
+            )
+            FROM ChatMembers cm
+            JOIN "User" u ON cm.user_id = u.user_id
+            WHERE cm.chat_id = c.chat_id
+          ),
+          '[]'::json
+        ) as participants
+      FROM Chat c
+      INNER JOIN ChatMembers cm ON c.chat_id = cm.chat_id
+      WHERE cm.user_id = $1
+      ORDER BY c.last_message_id DESC NULLS LAST`;
+
+    const result = await pool.query(query, [userId]);
+    
+    res.json({ 
+      success: true, 
+      chats: result.rows 
+    });
+  } catch (error) {
+    console.error('Error fetching chats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка при получении списка чатов'
+    });
+  }
+});
+
+// Get chat messages
+app.get('/api/chats/:chatId/messages', async (req, res) => {
+  const { chatId } = req.params;
+  
+  try {
+    const query = `
+      SELECT 
+        m.*,
+        CONCAT(u.first_name, ' ', u.last_name) as sender_name,
+        u.profile_image as sender_image
+      FROM Messages m
+      JOIN "User" u ON m.sender_id = u.user_id
+      WHERE m.chat_id = $1
+      ORDER BY m.date DESC
+      LIMIT 100`;
+
+    const result = await pool.query(query, [chatId]);
+    
+    res.json({ 
+      success: true, 
+      messages: result.rows 
+    });
+  } catch (error) {
+    console.error('Error fetching messages:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка при получении сообщений'
+    });
+  }
+});
+
+// Send new message
+app.post('/api/chats/:chatId/messages', async (req, res) => {
+  const { chatId } = req.params;
+  const { message_text, sender_id } = req.body;
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+
+    // Insert message
+    const messageResult = await client.query(
+      `INSERT INTO Messages (chat_id, message_text, sender_id)
+       VALUES ($1, $2, $3)
+       RETURNING message_id`,
+      [chatId, message_text, sender_id]
+    );
+
+    // Update chat's last_message_id
+    await client.query(
+      'UPDATE Chat SET last_message_id = $1 WHERE chat_id = $2',
+      [messageResult.rows[0].message_id, chatId]
+    );
+
+    await client.query('COMMIT');
+    
+    res.json({ 
+      success: true,
+      message_id: messageResult.rows[0].message_id
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error sending message:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка при отправке сообщения'
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// Send chat image
+app.post('/api/chats/:chatId/images', async (req, res) => {
+  const { chatId } = req.params;
+  const { image, sender_id } = req.body;
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+
+    // Upload to Cloudinary
+    const uploadResponse = await cloudinary.uploader.upload(image, {
+      folder: 'chat_images',
+      transformation: [
+        { quality: 'auto' }
+      ]
+    });
+
+    // Save image info to database
+    const result = await client.query(
+      `INSERT INTO MessageImages (chat_id, sender_id, image_url)
+       VALUES ($1, $2, $3)
+       RETURNING image_id, image_url, created_at`,
+      [chatId, sender_id, uploadResponse.secure_url]
+    );
+
+    await client.query('COMMIT');
+    
+    res.json({ 
+      success: true,
+      image: result.rows[0]
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error sending image:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка при отправке изображения'
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// Get chat images
+app.get('/api/chats/:chatId/images', async (req, res) => {
+  const { chatId } = req.params;
+  
+  try {
+    const query = `
+      SELECT 
+        mi.*,
+        CONCAT(u.first_name, ' ', u.last_name) as sender_name,
+        u.profile_image as sender_image
+      FROM MessageImages mi
+      JOIN "User" u ON mi.sender_id = u.user_id
+      WHERE mi.chat_id = $1
+      ORDER BY mi.created_at DESC`;
+
+    const result = await pool.query(query, [chatId]);
+    
+    res.json({ 
+      success: true, 
+      images: result.rows 
+    });
+  } catch (error) {
+    console.error('Error fetching chat images:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка при получении изображений'
+    });
+  }
+});
+
+// Get chat info
+app.get('/api/chats/:chatId', async (req, res) => {
+  const { chatId } = req.params;
+  
+  try {
+    const query = `
+      SELECT 
+        c.*,
+        CASE 
+          WHEN c.task_id IS NOT NULL THEN t.task_title
+          ELSE c.chat_name
+        END as chat_name,
+        CASE 
+          WHEN c.task_id IS NOT NULL THEN true
+          ELSE c.is_group_chat
+        END as is_group_chat,
+        COALESCE(
+          (
+            SELECT json_agg(
+              json_build_object(
+                'user_id', u.user_id,
+                'first_name', u.first_name,
+                'last_name', u.last_name,
+                'profile_image', u.profile_image
+              )
+            )
+            FROM ChatMembers cm
+            JOIN "User" u ON cm.user_id = u.user_id
+            WHERE cm.chat_id = c.chat_id
+          ),
+          '[]'
+        ) as participants
+      FROM Chat c
+      LEFT JOIN Tasks t ON c.task_id = t.task_id
+      WHERE c.chat_id = $1`;
+
+    const result = await pool.query(query, [chatId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Чат не найден'
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      chat: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error fetching chat:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка при получении информации о чате'
+    });
+  }
+});
+
+app.put('/api/users/:userId/cups-goal', async (req, res) => {
+  const { userId } = req.params;
+  const { purpose_cup_count } = req.body;
+  
+  try {
+    const result = await pool.query(
+      'UPDATE "User" SET purpose_cup_count = $1 WHERE user_id = $2 RETURNING *',
+      [purpose_cup_count, userId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    res.json({ success: true, user: result.rows[0] });
+  } catch (error) {
+    console.error('Update cups goal error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Ошибка при обновлении цели' 
+    });
+  }
+});
+
+// Create direct chat
+app.post('/api/chats/direct', async (req, res) => {
+  const { recipient_id, message } = req.body;
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+
+    // Create chat
+    const chatResult = await client.query(
+      `INSERT INTO Chat (
+        chat_name,
+        creator_id,
+        is_group_chat,
+        is_active
+      ) VALUES ($1, $2, $3, $4) RETURNING chat_id`,
+      ['Direct Chat', recipient_id, false, true]
+    );
+
+    const chatId = chatResult.rows[0].chat_id;
+
+    // Add both users to chat members
+    await client.query(
+      'INSERT INTO ChatMembers (chat_id, user_id) VALUES ($1, $2), ($1, $3)',
+      [chatId, recipient_id, req.body.sender_id]
+    );
+
+    // Add first message
+    const messageResult = await client.query(
+      `INSERT INTO Messages (chat_id, message_text, sender_id)
+       VALUES ($1, $2, $3)
+       RETURNING message_id`,
+      [chatId, message, req.body.sender_id]
+    );
+
+    // Update chat's last_message_id
+    await client.query(
+      'UPDATE Chat SET last_message_id = $1 WHERE chat_id = $2',
+      [messageResult.rows[0].message_id, chatId]
+    );
+
+    await client.query('COMMIT');
+    
+    res.json({ 
+      success: true,
+      chat_id: chatId,
+      message_id: messageResult.rows[0].message_id
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error creating direct chat:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Error creating chat' 
     });
   } finally {
     client.release();

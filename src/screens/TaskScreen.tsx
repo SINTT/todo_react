@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, StatusBar, Switch } from 'react-native';
+import { View, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, StatusBar, Switch, Alert } from 'react-native';
 import { Text } from '../components/CustomText';
 import { api } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -32,6 +32,7 @@ interface TaskDetails {
   creator_first_name: string;
   creator_last_name: string;
   creator_profile_image: string | null;
+  task_creater_id: number; // Add this property
 }
 
 const TaskScreen = ({ route, navigation }: any) => {
@@ -143,14 +144,30 @@ const TaskScreen = ({ route, navigation }: any) => {
   };
 
   const deleteTask = async () => {
-    try {
-      const response = await api.delete(`/api/tasks/${taskId}`);
-      if (response.data.success) {
-        navigation.goBack();
-      }
-    } catch (error) {
-      console.error('Error deleting task:', error);
-    }
+    Alert.alert(
+      "Подтверждение",
+      "Вы уверены, что хотите удалить это задание?",
+      [
+        {
+          text: "Отмена",
+          style: "cancel"
+        },
+        {
+          text: "Удалить",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const response = await api.delete(`/api/tasks/${taskId}`);
+              if (response.data.success) {
+                navigation.goBack();
+              }
+            } catch (error) {
+              console.error('Error deleting task:', error);
+            }
+          }
+        }
+      ]
+    );
   };
 
   // Add sorted subtasks getter
@@ -183,6 +200,19 @@ const TaskScreen = ({ route, navigation }: any) => {
     );
   }
 
+  const getStatusText = (status: string) => {
+  switch (status) {
+    case 'open':
+      return 'Открыто';
+    case 'in_progress':
+      return 'В процессе';
+    case 'completed':
+      return 'Завершено';
+    default:
+      return 'Неизвестно';
+  };
+};
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="gray" />
@@ -199,14 +229,53 @@ const TaskScreen = ({ route, navigation }: any) => {
           />
         </TouchableOpacity>
         <Text bold style={styles.headerTitle}>Задание</Text>
+
+        <View style={styles.backButton}/>
       </View>
 
+      
+
       <ScrollView style={styles.content}>
+
+        <View style={{flexDirection: 'row', alignItems: 'center', paddingBottom: 10, gap: 10}}>
+          {/* Creator Info */}
+          <View style={{flexDirection: 'row', alignItems: 'center', padding: 10, paddingRight: 15, gap: 10, backgroundColor: 'white', borderRadius: 150, height: 56}}>
+            <Image
+              source={
+                task.creator_profile_image
+                  ? { uri: task.creator_profile_image }
+                  : require('../assets/images/avatar.jpg')
+              }
+              style={styles.creatorAvatar}
+            />
+            <Text medium style={{fontSize: 16, color: '#2A2A2A'}}>
+              {task.creator_first_name} {task.creator_last_name}
+            </Text>
+          </View>
+
+          <View style={{alignItems: 'center', justifyContent: 'center', padding: 10, paddingRight: 15, backgroundColor: 'white', borderRadius: 150, height: 56}}>
+            <Text semiBold style={styles.reward}>🏆 {task.reward_points}</Text>
+          </View>
+
+          <View style={{flex: 1, alignItems: 'flex-end'}}>
+            {isCreator && task.status !== 'completed' && (
+              <TouchableOpacity 
+                style={[{height: 56, width: 56, backgroundColor: 'gray', borderRadius: 30, alignItems: 'center', justifyContent: 'center'}, {backgroundColor: '#2A2A2A'}]}
+                onPress={deleteTask}
+              >
+                <Image
+                  source={require('../assets/icons/trash.png')}
+                  style={{ width: 24, height: 24, tintColor: '#FFFFFF' }}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+
+        </View>
         {/* Task Info */}
         <View style={styles.taskInfoBlock}>
           <View style={styles.taskHeader}>
             <Text semiBold style={styles.taskTitle}>{task.task_title}</Text>
-            <Text style={styles.reward}>🏆 {task.reward_points}</Text>
           </View>
           
           <Text style={styles.description}>{task.task_description}</Text>
@@ -217,7 +286,6 @@ const TaskScreen = ({ route, navigation }: any) => {
               <ScrollView 
                 horizontal 
                 showsHorizontalScrollIndicator={false}
-                style={styles.imagesContainer}
               >
                 {task.images.map((imageUrl, index) => (
                   <TouchableOpacity
@@ -245,59 +313,85 @@ const TaskScreen = ({ route, navigation }: any) => {
             </>
           )}
 
-          <View style={styles.dateInfo}>
-            <Text style={styles.dateText}>
-              {formatDate(task.start_date)} - {formatDate(task.finish_date)}
-            </Text>
-          </View>
-
-          {/* Creator Info */}
-          <View style={styles.creatorInfo}>
-            <Image
-              source={
-                task.creator_profile_image
-                  ? { uri: task.creator_profile_image }
-                  : require('../assets/images/avatar.png')
-              }
-              style={styles.creatorAvatar}
-            />
-            <Text style={styles.creatorName}>
-              {task.creator_first_name} {task.creator_last_name}
-            </Text>
-          </View>
-        </View>
-
-        {/* Subtasks section */}
-        <View style={styles.subtasksBlock}>
-          <Text semiBold style={styles.blockTitle}>Подзадачи:</Text>
-          {getSortedSubtasks().map((subtask, index) => (
-            <View 
-              key={subtask.subtask_id}
-              style={[
-                styles.subtaskItem,
-                subtask.status === 'completed' && styles.subtaskCompleted,
-                index === currentSubtaskIndex && task.status === 'in_progress' && styles.subtaskCurrent
-              ]}
-            >
-              <View style={styles.subtaskHeader}>
-                <Text semiBold style={styles.subtaskTitle}>{subtask.title}</Text>
-                {task.status === 'in_progress' && (
-                  <Switch
-                    trackColor={{ false: '#767577', true: '#81b0ff' }}
-                    thumbColor={subtask.status === 'completed' ? '#4CAF50' : '#f4f3f4'}
-                    ios_backgroundColor="#3e3e3e"
-                    onValueChange={() => toggleSubtask(
-                      subtask.subtask_id, 
-                      subtask.status === 'completed' ? 'pending' : 'completed'
-                    )}
-                    value={subtask.status === 'completed'}
-                  />
-                )}
-              </View>
-              <Text style={styles.subtaskDescription}>{subtask.description}</Text>
+          <View style={{flexDirection: 'row', justifyContent: 'space-between', marginTop: 10, alignItems: 'center'}}>
+            <View style={{borderWidth: 1, borderRadius: 25, height: 34, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 15}}>
+              <Text style={{}}>
+                {formatDate(task.start_date)} - {formatDate(task.finish_date)}
+              </Text>
             </View>
-          ))}
+
+            <View style={{
+              backgroundColor: task.status === 'completed' ? '#E8F5E9' : '#F5F5F5',
+              borderRadius: 25,
+              height: 34, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 15
+            }}>
+              <Text medium style={{
+                color: task.status === 'completed' ? '#4CAF50' : '#2A2A2A'
+              }}>
+                {getStatusText(task.status)}
+              </Text>
+            </View>
+          </View>
+
         </View>
+
+        {/* Performers Section */}
+        <View style={styles.performersBlock}>
+          <Text semiBold style={{fontSize: 14, opacity: 0.8, marginBottom: 10}}>Исполнители:</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {task.performers
+              .filter(performer => performer.user_id !== task.task_creater_id) // Exclude the creator
+              .map((performer, index) => (
+                <View key={index} style={styles.performerItemHorizontal}>
+                  <Image
+                    source={
+                      performer.profile_image
+                        ? { uri: performer.profile_image }
+                        : require('../assets/images/avatar.png')
+                    }
+                    style={styles.performerAvatar}
+                  />
+                  <Text medium style={styles.performerNameHorizontal}>
+                    {performer.first_name} {performer.last_name}
+                  </Text>
+                </View>
+              ))}
+          </ScrollView>
+        </View>
+
+        {/* Subtasks Section */}
+        {getSortedSubtasks().map((subtask, index) => (
+          <View
+            key={subtask.subtask_id}
+            style={[
+              styles.subtaskItem,
+              subtask.status === 'completed' && styles.subtaskCompleted,
+              index === currentSubtaskIndex && task.status === 'in_progress' && styles.subtaskCurrent,
+            ]}
+          >
+            <View style={styles.subtaskHeader}>
+              <Text semiBold style={styles.subtaskTitle}>
+                {index + 1}. {subtask.title}
+              </Text>
+              {task.status === 'in_progress' && (
+                <Switch
+                  trackColor={{ false: '#767577', true: '#81b0ff' }}
+                  thumbColor={subtask.status === 'completed' ? '#4CAF50' : '#f4f3f4'}
+                  ios_backgroundColor="#3e3e3e"
+                  onValueChange={() =>
+                    toggleSubtask(
+                      subtask.subtask_id,
+                      subtask.status === 'completed' ? 'pending' : 'completed'
+                    )
+                  }
+                  value={subtask.status === 'completed'}
+                />
+              )}
+            </View>
+            <Text style={styles.subtaskDescription}>{subtask.description}</Text>
+          </View>
+        ))}
+
 
         {/* Action Buttons */}
         {canStart && task.status === 'open' && (
@@ -327,15 +421,7 @@ const TaskScreen = ({ route, navigation }: any) => {
           </TouchableOpacity>
         )}
 
-        {/* Delete Button for creator */}
-        {isCreator && task.status !== 'completed' && (
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.deleteButton]}
-            onPress={deleteTask}
-          >
-            <Text semiBold style={styles.actionButtonText}>Удалить задание</Text>
-          </TouchableOpacity>
-        )}
+      
       </ScrollView>
     </View>
   );
@@ -344,7 +430,7 @@ const TaskScreen = ({ route, navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFF',
   },
   loadingContainer: {
     flex: 1,
@@ -354,15 +440,16 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 24,
-    padding: 24,
+    height: 78,
+    paddingHorizontal: 10,
+    backgroundColor: '#FFFFFF',
     marginTop: StatusBar.currentHeight,
   },
   backButton: {
     width: 54,
     height: 54,
-    backgroundColor: '#F3F6FB',
-    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -377,19 +464,20 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 20,
+    padding: 10,
+    backgroundColor: '#EDEDED'
   },
   taskInfoBlock: {
-    backgroundColor: '#F3F6FB',
-    borderRadius: 25,
-    padding: 20,
-    marginBottom: 20,
+    backgroundColor: '#FFF',
+    borderRadius: 14,
+    padding: 20, // Changed from 20 to 10
+    marginBottom: 10, // Changed from 20 to 10
+    gap: 10,
   },
   taskHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
   },
   taskTitle: {
     fontSize: 20,
@@ -401,20 +489,14 @@ const styles = StyleSheet.create({
   description: {
     fontSize: 16,
     color: '#666666',
-    marginBottom: 15,
-  },
-  imagesContainer: {
-    marginBottom: 15,
   },
   taskImage: {
     width: 200,
     height: 150,
-    borderRadius: 10,
+    borderRadius: 14,
     marginRight: 10,
   },
-  dateInfo: {
-    marginBottom: 15,
-  },
+
   dateText: {
     color: '#666666',
   },
@@ -428,14 +510,11 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
   },
-  creatorName: {
-    color: '#666666',
-  },
   subtasksBlock: {
-    backgroundColor: '#F3F6FB',
-    borderRadius: 25,
-    padding: 20,
-    marginBottom: 20,
+    backgroundColor: '#FFF',
+    borderRadius: 14,
+    padding: 20, // Changed from 20 to 10
+    marginBottom: 10, // Changed from 20 to 10
   },
   blockTitle: {
     fontSize: 18,
@@ -469,15 +548,15 @@ const styles = StyleSheet.create({
     color: '#666666',
   },
   actionButton: {
-    height: 56,
+    height: 64,
     backgroundColor: '#2A2A2A',
-    borderRadius: 25,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: 40, // Changed from 20 to 10
   },
   completeTaskButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#2A2A2A',
   },
   deleteButton: {
     backgroundColor: '#FF5252',
@@ -500,6 +579,35 @@ const styles = StyleSheet.create({
   completeButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
+  },
+  performersBlock: {
+    backgroundColor: '#FFF',
+    borderRadius: 14,
+    padding: 20,
+    marginBottom: 10,
+  },
+  performerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  performerItemHorizontal: {
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  performerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  performerName: {
+    fontSize: 16,
+    color: '#2A2A2A',
+  },
+  performerNameHorizontal: {
+    fontSize: 14,
+    color: '#2A2A2A',
+    marginTop: 5,
   },
 });
 

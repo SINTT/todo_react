@@ -61,7 +61,8 @@ const CreateOrganizationScreen = ({ navigation }: any) => {
             style={styles.backIcon}
           />
         </TouchableOpacity>
-        <Text semiBold style={styles.headerTitle}>Создание организации</Text>
+        <Text bold style={styles.headerTitle}>Новая организация</Text>
+        <View style={styles.backButton}/>
       </View>
 
       <View style={styles.content}>
@@ -77,7 +78,7 @@ const CreateOrganizationScreen = ({ navigation }: any) => {
 
         <View style={styles.inputContainer}>
           <TextInput
-            style={[styles.input, { height: 120, textAlignVertical: 'top', paddingTop: 32 }]}
+            style={styles.input}
             placeholder=""
             multiline
             value={description}
@@ -110,21 +111,24 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 24,
-    padding: 24,
+    height: 78,
+    paddingHorizontal: 10,
+    backgroundColor: '#FFFFFF',
     marginTop: StatusBar.currentHeight,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
   },
   backButton: {
     width: 54,
     height: 54,
-    backgroundColor: '#F3F6FB',
-    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
   backIcon: {
-    width: 24,
-    height: 24,
+    width: 54,
+    height: 54,
     tintColor: '#2A2A2A',
   },
   headerTitle: {
@@ -133,12 +137,11 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 24,
-    gap: 24,
+    padding: 20,
+    gap: 10,
   },
   inputContainer: {
     height: 56,
-    marginBottom: 10,
     position: 'relative',
   },
   label: {

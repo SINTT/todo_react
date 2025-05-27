@@ -60,77 +60,89 @@ const OrganizationScreen = ({navigation}: any) => {
   };
 
   const renderNoOrganization = () => (
-    <View style={styles.noOrgContainer}>
-      
-      <Text semiBold style={styles.noOrgTitle}>
-        Вы пока не состоите в организации
-      </Text>
-      <Text style={styles.noOrgDescription}>
-        Присоединитесь к существующей организации или создайте свою
-      </Text>
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity 
-          style={styles.button}
-          onPress={() => navigation.navigate('Поиск')}
-        >
-          <Text semiBold style={styles.buttonText}>
-            Найти организацию
+    <View style={styles.container}>
+      <View style={styles.headerBackground} />
+      <View style={styles.content}>
+        <View style={styles.noOrgContainer}>
+          <Text semiBold style={styles.noOrgTitle}>
+            Вы пока не состоите в организации
           </Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.button, styles.buttonPrimary]}
-          onPress={() => navigation.navigate('CreateOrganization')}
-        >
-          <Text semiBold style={[styles.buttonText, styles.buttonTextPrimary]}>
-            Создать организацию
+          <Text style={styles.noOrgDescription}>
+            Присоединитесь к существующей организации или создайте свою
           </Text>
-        </TouchableOpacity>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity 
+              style={styles.button}
+              onPress={() => navigation.navigate('Поиск')}
+            >
+              <Text semiBold style={styles.buttonText}>
+                Найти организацию
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.button, styles.buttonPrimary]}
+              onPress={() => navigation.navigate('CreateOrganization')}
+            >
+              <Text semiBold style={[styles.buttonText, styles.buttonTextPrimary]}>
+                Создать организацию
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
     </View>
   );
 
   const renderOrganizationInfo = () => (
-    <View style={styles.orgContainer}>
-      <View style={styles.orgHeader}>
-        <Image
-          source={
-            organization.organization_image
-              ? { uri: organization.organization_image }
-              : require('../assets/images/avatar.png')
-          }
-          style={styles.orgImage}
-        />
-        <Text semiBold style={styles.orgName}>
-          {organization.organization_name}
-        </Text>
-        <Text style={styles.orgDescription}>
-          {organization.description || 'Нет описания'}
-        </Text>
+    <View style={styles.container}>
+      <View style={styles.headerBackground} />
+      <View style={styles.header}>
+        {(isAdmin || userRole === 'Manager') && (
+          <TouchableOpacity 
+            style={styles.settingsButton}
+            onPress={() => navigation.navigate('OrganizationSettings')}
+          >
+            <Image 
+              source={require('../assets/icons/settings.png')}
+              style={{height: 28, width: 28, tintColor: 'black'}}
+            />
+          </TouchableOpacity>
+        )}
       </View>
 
-      {(isAdmin || userRole === 'Manager') ? (
-        <TouchableOpacity 
-          style={styles.settingsButton}
-          onPress={() => navigation.navigate('OrganizationSettings')}
-        >
-          <Image
-            source={require('../assets/icons/settings.png')}
-            style={styles.settingsIcon}
-          />
-          <Text semiBold style={styles.settingsText}>
-            Настройки организации
+      <View style={styles.content}>
+        <View style={styles.profileInfo}>
+          <TouchableOpacity style={styles.avatarContainer}>
+            <Image
+              source={
+                organization.organization_image
+                  ? { uri: organization.organization_image }
+                  : require('../assets/images/avatar.png')
+              }
+              style={styles.avatarImage}
+            />
+          </TouchableOpacity>
+          <Text semiBold style={styles.orgName}>
+            {organization.organization_name}
           </Text>
-        </TouchableOpacity>
-      ) : (
-        <TouchableOpacity 
-          style={styles.leaveButton}
-          onPress={handleLeaveOrganization}
-        >
-          <Text semiBold style={styles.leaveButtonText}>
-            Покинуть организацию
+          <Text style={styles.orgDescription}>
+            {organization.description || 'Нет описания'}
           </Text>
-        </TouchableOpacity>
-      )}
+        </View>
+
+        {!isAdmin && userRole !== 'Manager' && (
+          <View style={styles.socialActions}>
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.leaveButton]}
+              onPress={handleLeaveOrganization}
+            >
+              <Text semiBold style={styles.leaveButtonText}>
+                Покинуть организацию
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
     </View>
   );
 
@@ -138,9 +150,6 @@ const OrganizationScreen = ({navigation}: any) => {
     return (
       <View style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor="gray" />
-        <View style={styles.header}>
-          <Text semiBold style={styles.headerTitle}>Организация</Text>
-        </View>
         <View style={styles.loadingContainer}>
           <Text>Загрузка...</Text>
         </View>
@@ -149,13 +158,10 @@ const OrganizationScreen = ({navigation}: any) => {
   }
 
   return (
-    <View style={styles.container}>
+    <>
       <StatusBar barStyle="dark-content" backgroundColor="gray" />
-      <View style={styles.header}>
-        <Text semiBold style={styles.headerTitle}>Организация</Text>
-      </View>
       {organization ? renderOrganizationInfo() : renderNoOrganization()}
-    </View>
+    </>
   );
 };
 
@@ -164,22 +170,54 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  headerBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 200,
+    backgroundColor: '#00FF96',
+  },
   header: {
-    backgroundColor: '#F3F6FB',
-    height: 74,
+    height: 175,
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 24,
+    alignItems: 'flex-start',
+    justifyContent: 'flex-end',
+    padding: 24,
     marginTop: StatusBar.currentHeight,
   },
-  headerTitle: {
-    fontSize: 24,
-    color: '#2A2A2A',
-  },
-  loadingContainer: {
+  content: {
     flex: 1,
+    backgroundColor: '#fff',
+    marginTop: -25,
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+  },
+  profileInfo: {
+    alignItems: 'center',
+    marginTop: -50,
+  },
+  avatarContainer: {
+    width: 124,
+    height: 124,
+    borderRadius: 68,
+    borderWidth: 6,
+    borderColor: '#2A2A2A',
+    padding: 3,
+    backgroundColor: 'white',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 68,
+  },
+  settingsButton: {
+    width: 48,
+    height: 48,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    borderRadius: 24,
   },
   noOrgContainer: {
     flex: 1,
@@ -187,15 +225,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 24,
   },
-  noOrgImage: {
-    width: 200,
-    height: 200,
-    marginBottom: 24,
-  },
   noOrgTitle: {
-    fontSize: 20,
+    fontSize: 24,
     color: '#2A2A2A',
     marginBottom: 8,
+    textAlign: 'center',
   },
   noOrgDescription: {
     fontSize: 16,
@@ -225,58 +259,45 @@ const styles = StyleSheet.create({
   buttonTextPrimary: {
     color: '#FFFFFF',
   },
-  orgContainer: {
-    flex: 1,
-    padding: 24,
-  },
-  orgHeader: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  orgImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    marginBottom: 16,
-  },
   orgName: {
     fontSize: 24,
     color: '#2A2A2A',
-    marginBottom: 8,
+    marginTop: 16,
   },
   orgDescription: {
     fontSize: 16,
-    color: '#666666',
+    color: '#9C9C9C',
+    marginTop: 4,
     textAlign: 'center',
+    paddingHorizontal: 24,
   },
-  settingsButton: {
-    flexDirection: 'row',
+  socialActions: {
+    width: '100%',
+    padding: 12,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#F3F6FB',
+  },
+  actionButton: {
     borderRadius: 16,
-    gap: 12,
-  },
-  settingsIcon: {
-    width: 24,
-    height: 24,
-    tintColor: '#2A2A2A',
-  },
-  settingsText: {
-    fontSize: 16,
-    color: '#2A2A2A',
+    paddingHorizontal: 25,
+    height: 64,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 200,
   },
   leaveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
     backgroundColor: '#FFE5E5',
-    borderRadius: 16,
-    justifyContent: 'center',
   },
   leaveButtonText: {
     fontSize: 16,
     color: '#FF3B30',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
