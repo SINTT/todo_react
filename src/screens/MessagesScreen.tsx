@@ -182,6 +182,17 @@ const MessagesScreen = ({ navigation }: any) => {
           </View>
         )}
       />
+
+      <TouchableOpacity 
+        style={styles.fab}  
+        onPress={() => navigation.navigate('AiChatScreen')}
+      >
+        <Image 
+          source={require('../assets/icons/plus.png')}
+          style={{width: 24, height: 24, tintColor: '#fff'}}
+        />
+        <Text semiBold style={styles.fabText}>ИИ-ассистент</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -201,6 +212,26 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
   },
+
+  fab: {
+    position: 'absolute',
+    right: 16,
+    bottom: 16,
+    backgroundColor: '#2A2A2A',
+    borderRadius: 16,
+    paddingRight: 25,
+    paddingLeft: 20,
+    height: 64,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fabText: {
+    color: '#fff',
+    fontSize: 16,
+  },
+
   chatList: {
     padding: 16,
   },

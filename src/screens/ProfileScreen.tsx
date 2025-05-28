@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, StyleSheet, Image, TouchableOpacity, StatusBar, ScrollView, TextInput, Modal, ViewStyle } from 'react-native';
+import { View, StyleSheet, Image, TouchableOpacity, StatusBar, ScrollView, TextInput, Modal, ViewStyle, RefreshControl } from 'react-native';
 import { Text } from '../components/CustomText';
 import { api } from '../config/api';
 
@@ -12,7 +12,7 @@ interface UserData {
   last_name: string;
   patronymic?: string;
   profile_image?: string;
-  post_id?: number;
+  post_name?: string;  // Добавляем поле post_name
   full_cup_count: number;
   now_cup_count: number;
   purpose_cup_count: number;
@@ -25,19 +25,29 @@ const ProfileScreen = ({ navigation }: any) => {
   const [imageError, setImageError] = useState(false);
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [newGoal, setNewGoal] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadUserData = async () => {
+    try {
+      const userToken = await AsyncStorage.getItem('userToken');
+      if (userToken) {
+        setUserData(JSON.parse(userToken));
+      }
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    }
+  };
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadUserData();
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const userToken = await AsyncStorage.getItem('userToken');
-        if (userToken) {
-          setUserData(JSON.parse(userToken));
-        }
-      } catch (error) {
-        console.error('Error loading user data:', error);
-      }
-    };
-
     loadUserData();
   }, []);
 
@@ -47,7 +57,7 @@ const ProfileScreen = ({ navigation }: any) => {
 
   const handleUpdateGoal = async () => {
     try {
-      if (!userData) return;  // Add early return if no userData
+      if (!userData) return;  
       
       const goal = parseInt(newGoal);
       if (isNaN(goal) || goal <= 0) return;
@@ -117,80 +127,90 @@ const ProfileScreen = ({ navigation }: any) => {
   };
 
   return (
-    <View style={styles.container}>
+    <>
       <StatusBar barStyle="dark-content" backgroundColor="gray" />
-      <View style={styles.headerBackground} />
-      
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.settingsButton}
-          onPress={() => navigation.navigate('Settings')}
-        >
-          <Image 
-            source={require('../assets/icons/settings.png')}
-            style={{height: 28, width: 28, tintColor: 'black'}}
+      <ScrollView 
+        style={styles.container}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#00FF96"
+            colors={['#00FF96']}
           />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.content}>
-        <View style={styles.profileInfo}>
-          <TouchableOpacity style={styles.avatarContainer}>
+        }
+      >
+        <View style={styles.headerBackground} />
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.settingsButton}
+            onPress={() => navigation.navigate('Settings')}
+          >
             <Image 
-              source={
-                userData?.profile_image && !imageError
-                  ? { uri: userData.profile_image }
-                  : require('../assets/images/avatar.jpg')
-              }
-              style={styles.avatarImage}
-              onError={() => setImageError(true)}
+              source={require('../assets/icons/settings.png')}
+              style={{height: 28, width: 28, tintColor: 'black'}}
             />
           </TouchableOpacity>
-          <View style={styles.nameContainer}>
-            <Text semiBold style={styles.userName}>
-              {userData ? `${userData.first_name} ${userData.last_name}` : 'Загрузка...'}
-            </Text>
-            {userData && (
-              <Text style={styles.level}>{calculateLevel(userData.full_cup_count)}lvl</Text>
-            )}
-          </View>
-          <Text style={styles.userRole}>
-            {userData?.post_id ? 'Специальность' : 'Нет специальности'}
-          </Text>
         </View>
 
-        <ScrollView style={styles.widgets}>
-          <View style={styles.goalWidget}>
-            <View style={styles.goalHeader}>
-              <Text semiBold style={styles.goalTitle}>Цель кубков</Text>
-              <TouchableOpacity onPress={() => setIsEditingGoal(true)}>
-                <Image 
-                  source={require('../assets/icons/writing.png')}
-                  style={styles.editIcon}
-                />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.goalInfo}>
-              <Text style={styles.cupsCount}>
-                {userData?.now_cup_count || 0} / {userData?.purpose_cup_count || 0}
-              </Text>
-            </View>
-            
-            <View style={styles.progressBarContainer}>
-              <View 
-                style={[
-                  styles.progressBar,
-                  getProgressWidth()
-                ]} 
+        <View style={styles.content}>
+          <View style={styles.profileInfo}>
+            <TouchableOpacity style={styles.avatarContainer}>
+              <Image 
+                source={
+                  userData?.profile_image && !imageError
+                    ? { uri: userData.profile_image }
+                    : require('../assets/images/avatar.jpg')
+                }
+                style={styles.avatarImage}
+                onError={() => setImageError(true)}
               />
+            </TouchableOpacity>
+            <View style={styles.nameContainer}>
+              <Text semiBold style={styles.userName}>
+                {userData ? `${userData.first_name} ${userData.last_name}` : 'Загрузка...'}
+              </Text>
+              {userData && (
+                <Text style={styles.level}>{calculateLevel(userData.full_cup_count)}lvl</Text>
+              )}
+            </View>
+            <Text style={styles.userRole}>
+              {userData?.post_name || 'Нет должности'}
+            </Text>
+          </View>
+
+          <View style={styles.widgets}>
+            <View style={styles.goalWidget}>
+              <View style={styles.goalHeader}>
+                <Text semiBold style={styles.goalTitle}>Цель кубков</Text>
+                <TouchableOpacity onPress={() => setIsEditingGoal(true)}>
+                  <Image 
+                    source={require('../assets/icons/writing.png')}
+                    style={styles.editIcon}
+                  />
+                </TouchableOpacity>
+              </View>
+              
+              <View style={styles.goalInfo}>
+                <Text style={styles.cupsCount}>
+                  {userData?.now_cup_count || 0} / {userData?.purpose_cup_count || 0}
+                </Text>
+              </View>
+              
+              <View style={styles.progressBarContainer}>
+                <View 
+                  style={[
+                    styles.progressBar,
+                    getProgressWidth()
+                  ]} 
+                />
+              </View>
             </View>
           </View>
-        </ScrollView>
-      </View>
-
+        </View>
+      </ScrollView>
       {renderGoalEditModal()}
-    </View>
+    </>
   );
 };
 
@@ -232,7 +252,7 @@ const styles = StyleSheet.create({
   },
   profileInfo: {
     alignItems: 'center',
-    marginTop: -50,
+    marginTop: -55, 
   },
   avatarContainer: {
     width: 124,
@@ -242,6 +262,7 @@ const styles = StyleSheet.create({
     borderColor: '#2A2A2A',
     padding: 3,
     backgroundColor: 'white',
+    marginBottom: 16,
   },
   avatarImage: {
     width: '100%',

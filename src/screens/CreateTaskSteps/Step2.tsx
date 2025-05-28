@@ -110,7 +110,7 @@ export const Step2: React.FC<Step2Props> = ({
     const start = startDate.toISOString().split('T')[0];
     marked[start] = {
       startingDay: true,
-      color: '#2A2A2A',
+      color: '#00D87F',
       textColor: '#FFFFFF'
     };
 
@@ -118,7 +118,7 @@ export const Step2: React.FC<Step2Props> = ({
       const end = endDate.toISOString().split('T')[0];
       marked[end] = {
         endingDay: true,
-        color: '#2A2A2A',
+        color: '#00D87F',
         textColor: '#FFFFFF'
       };
 
@@ -129,7 +129,7 @@ export const Step2: React.FC<Step2Props> = ({
         const dateString = current.toISOString().split('T')[0];
         if (dateString !== end) {
           marked[dateString] = {
-            color: '#2A2A2A',
+            color: '#00D87F',
             textColor: '#FFFFFF'
           };
         }
@@ -273,7 +273,7 @@ export const Step2: React.FC<Step2Props> = ({
           markedDates={getMarkedDates()}
           markingType={startDate && endDate ? "period" : "dot"}
           theme={{
-            selectedDayBackgroundColor: '#2A2A2A',
+            selectedDayBackgroundColor: '#00D87F',
             selectedDayTextColor: '#FFFFFF',
             todayTextColor: '#2A2A2A',
             textDayFontFamily: 'Montserrat-Regular',

@@ -12,7 +12,7 @@ const pool = new Pool({
   user: 'postgres',
   host: 'localhost',
   database: 'TODO',
-  password: '2099', // Change this
+  password: '2099',
   port: 5432,
 });
 
@@ -22,29 +22,29 @@ cloudinary.config({
   api_secret: 'PJP_EDY5adVETUcgpEE2IpmQKBo'
 });
 
-// Health check endpoint
+// Проверка работоспособности
 app.get('/health', (req, res) => {
   try {
-    // Test database connection
+    // Проверка подключения к базе
     pool.query('SELECT 1')
       .then(() => {
-        res.status(200).json({ status: 'ok', message: 'Server is running' });
+        res.status(200).json({ status: 'ok', message: 'Сервер работает' });
       })
       .catch(err => {
-        console.error('Database connection error:', err);
-        res.status(500).json({ status: 'error', message: 'Database connection failed' });
+        console.error('Ошибка подключения к базе данных:', err);
+        res.status(500).json({ status: 'error', message: 'Ошибка подключения к базе данных' });
       });
   } catch (error) {
-    res.status(500).json({ status: 'error', message: 'Server error' });
+    res.status(500).json({ status: 'error', message: 'Ошибка сервера' });
   }
 });
 
-// Auth endpoints
+// Конечные точки аутентификации
 app.post('/api/auth/register', async (req, res) => {
   const { email, password, first_name, last_name, patronymic } = req.body;
   
   try {
-    // Basic validation
+
     if (!email || !password || !first_name || !last_name) {
       return res.status(400).json({ 
         success: false, 
@@ -64,13 +64,13 @@ app.post('/api/auth/register', async (req, res) => {
   } catch (error) {
     console.error('Registration error:', error);
     
-    // Handle specific PostgreSQL errors
-    if (error.code === '23505') { // Unique violation
+
+    if (error.code === '23505') { 
       res.status(400).json({ 
         success: false, 
         error: 'Email already registered' 
       });
-    } else if (error.code === '23514') { // Check constraint violation
+    } else if (error.code === '23514') { 
       res.status(400).json({ 
         success: false, 
         error: 'Invalid email format' 
@@ -107,27 +107,29 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
 
-    // Get additional user data
+
     const userData = await pool.query(
       `SELECT 
-        user_id, 
-        first_name, 
-        last_name, 
-        patronymic,
-        email,
-        profile_image,
-        organization_id,
-        full_cup_count,
-        now_cup_count,
-        purpose_cup_count,
-        role,
-        status
-      FROM "User" 
-      WHERE user_id = $1`,
+        u.user_id, 
+        u.first_name, 
+        u.last_name, 
+        u.patronymic,
+        u.email,
+        u.profile_image,
+        u.organization_id,
+        u.full_cup_count,
+        u.now_cup_count,
+        u.purpose_cup_count,
+        u.role,
+        u.status,
+        p.post_name
+      FROM "User" u
+      LEFT JOIN Positions p ON u.post_id = p.post_id
+      WHERE u.user_id = $1`,
       [authResult.rows[0].user_id]
     );
 
-    // Update last login
+    // last login
     await pool.query(
       'UPDATE "User" SET last_login = CURRENT_TIMESTAMP WHERE user_id = $1',
       [authResult.rows[0].user_id]
@@ -363,10 +365,18 @@ app.delete('/api/organizations/:orgId', async (req, res) => {
 });
 
 app.get('/api/organizations/:orgId/participants', async (req, res) => {
-  const { orgId } = req.params;
-  const { query } = req.query;
-  
   try {
+    const orgId = parseInt(req.params.orgId);
+    const { query } = req.query;
+    
+    // Проверяем, что orgId является числом и существует
+    if (!orgId || isNaN(orgId)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid organization ID' 
+      });
+    }
+
     let queryText = `
       SELECT u.user_id, u.first_name, u.last_name, u.profile_image, u.role, p.post_name
       FROM "User" u
@@ -1509,7 +1519,7 @@ app.get('/api/chats/:chatId/images', async (req, res) => {
   }
 });
 
-// Get chat info
+// Получение информации о чате
 app.get('/api/chats/:chatId', async (req, res) => {
   const { chatId } = req.params;
   
@@ -1651,7 +1661,122 @@ app.post('/api/chats/direct', async (req, res) => {
   }
 });
 
+// Upload organization image
+app.put('/api/organizations/:orgId/organization-image', async (req, res) => {
+  const { orgId } = req.params;
+  const { image } = req.body;
+  
+  try {
+    // Upload to Cloudinary
+    const uploadResponse = await cloudinary.uploader.upload(image, {
+      folder: 'organization_images',
+      transformation: [
+        { width: 400, height: 400, crop: 'fill' },
+        { quality: 'auto' }
+      ]
+    });
+
+    // Update organization image in database
+    const result = await pool.query(
+      'UPDATE Organization SET organization_image = $1 WHERE organization_id = $2 RETURNING *',
+      [uploadResponse.secure_url, orgId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Organization not found' });
+    }
+
+    res.json({ 
+      success: true, 
+      organization: result.rows[0],
+      organization_image: uploadResponse.secure_url 
+    });
+  } catch (error) {
+    console.error('Update organization image error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Ошибка при обновлении фото. Пожалуйста, попробуйте ещё раз' 
+    });
+  }
+});
+
+// Получение должностей
+app.get('/api/organizations/:orgId/positions', async (req, res) => {
+  try {
+    const { orgId } = req.params;
+    const result = await pool.query(
+      'SELECT * FROM Positions WHERE organization_id = $1 ORDER BY post_name',
+      [orgId]
+    );
+    
+    res.json({ 
+      success: true, 
+      positions: result.rows 
+    });
+  } catch (error) {
+    console.error('Error fetching positions:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Ошибка при получении должностей' 
+    });
+  }
+});
+
+// Создание должности
+app.post('/api/organizations/:orgId/positions', async (req, res) => {
+  try {
+    const { orgId } = req.params;
+    const { name } = req.body;
+    
+    const result = await pool.query(
+      'INSERT INTO Positions (post_name, organization_id) VALUES ($1, $2) RETURNING *',
+      [name, orgId]
+    );
+    
+    res.json({ 
+      success: true, 
+      position: result.rows[0] 
+    });
+  } catch (error) {
+    console.error('Error creating position:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Ошибка при создании должности' 
+    });
+  }
+});
+
+// Назначение должности пользователю
+app.post('/api/users/:userId/position', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { positionId } = req.body;
+    
+    // Обновляем с дополнительным JOIN для получения названия должности
+    const result = await pool.query(
+      `UPDATE "User" u
+       SET post_id = $1
+       FROM Positions p
+       WHERE u.user_id = $2
+       AND p.post_id = $1
+       RETURNING u.*, p.post_name`,
+      [positionId, userId]
+    );
+    
+    res.json({ 
+      success: true, 
+      user: result.rows[0] 
+    });
+  } catch (error) {
+    console.error('Error assigning position:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Ошибка при назначении должности' 
+    });
+  }
+});
+
 const PORT = 3000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Сервер запущен на порту ${PORT}`);
 });

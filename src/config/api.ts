@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-export const API_URL = 'http://10.0.2.2:3000'; // For Android Emulator
-// export const API_URL = 'http://localhost:3000'; // For iOS Simulator
+export const API_URL = 'http://10.0.2.2:3000';
+
 
 export const api = axios.create({
   baseURL: API_URL,

@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../config/api';
 import AvatarMenu from '../components/AvatarMenu';
 
-// Обновляем интерфейс Task чтобы он соответствовал данным с сервера
+
 interface Task {
   task_id: number;
   task_title: string;
@@ -74,7 +74,7 @@ const HomeScreen = ({navigation}: any) => {
     }
   }, [userId, selectedPeriod, selectedDates]);
 
-  // Add navigation listener to refresh tasks when screen is focused
+ 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       if (userId) {
@@ -117,7 +117,7 @@ const HomeScreen = ({navigation}: any) => {
 
       if (response.data.success) {
         const taskList = response.data.tasks || [];
-        // Сортируем задания: сначала активные (новые и в процессе), потом завершенные
+        // Сорт задания сначала активные потом завершенные
         const sortedTasks = taskList.sort((a: Task, b: Task) => {
           if (a.status === 'completed' && b.status !== 'completed') return 1;
           if (a.status !== 'completed' && b.status === 'completed') return -1;
@@ -212,7 +212,7 @@ const HomeScreen = ({navigation}: any) => {
         avatarPosition={avatarPosition}
       />
 
-      {/* Period buttons */}
+      {/* фильтрация кнопки */}
       <View style={styles.periodScrollViewContainer}>
         <ScrollView 
           horizontal 

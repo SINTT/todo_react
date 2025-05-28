@@ -1,7 +1,7 @@
--- 1. Сначала создаем extension для хэширования паролей
+
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- 2. Создаем базовые таблицы без внешних ключей
+
 CREATE TABLE Organization (
     organization_id SERIAL PRIMARY KEY,
     organization_name VARCHAR(255),
@@ -42,18 +42,18 @@ CREATE TABLE "User" (
     language VARCHAR(10)
 );
 
--- 3. Создаем остальные таблицы
+
 CREATE TABLE Tasks (
     task_id SERIAL PRIMARY KEY,
     organization_id INT,
     task_title VARCHAR(255),
     task_description VARCHAR(255),
-    image_id VARCHAR(255), -- JSON или массив URL изображений
+    image_id VARCHAR(255),
     start_date TIMESTAMP,
     finish_date TIMESTAMP,
     task_creater_id INT,
     priority VARCHAR(50) CHECK (priority IN ('low', 'medium', 'high')),
-    status VARCHAR(50) CHECK (status IN ('open', 'in_progress', 'completed')), -- исправлено здесь
+    status VARCHAR(50) CHECK (status IN ('open', 'in_progress', 'completed')), 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP
 );
@@ -62,12 +62,12 @@ CREATE TABLE Chat (
     chat_id SERIAL PRIMARY KEY,
     chat_name VARCHAR(255),
     chat_image VARCHAR(255),
-    task_id INT NULL,  -- task_id может быть NULL, если чат не привязан к задаче
+    task_id INT NULL,  
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     creator_id INT,
     is_group_chat BOOLEAN DEFAULT FALSE,
     last_message_id INT,
-    is_active BOOLEAN DEFAULT true -- Добавлено поле is_active
+    is_active BOOLEAN DEFAULT true 
 );
 
 CREATE TABLE Messages (
@@ -113,7 +113,7 @@ CREATE TABLE TaskImages (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Таблица для комментариев к задачам
+
 CREATE TABLE TaskComments (
     comment_id SERIAL PRIMARY KEY,
     task_id INT,
@@ -124,7 +124,7 @@ CREATE TABLE TaskComments (
     FOREIGN KEY (user_id) REFERENCES "User"(user_id)
 );
 
--- Таблица для уведомлений
+
 CREATE TABLE Notifications (
     notification_id SERIAL PRIMARY KEY,
     user_id INT,
@@ -132,11 +132,11 @@ CREATE TABLE Notifications (
     content TEXT,
     is_read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    related_id INT, -- ID связанной сущности (задачи, сообщения и т.д.)
+    related_id INT, 
     FOREIGN KEY (user_id) REFERENCES "User"(user_id)
 );
 
--- Таблица для истории изменений задач
+
 CREATE TABLE TaskHistory (
     history_id SERIAL PRIMARY KEY,
     task_id INT,
@@ -149,7 +149,7 @@ CREATE TABLE TaskHistory (
     FOREIGN KEY (user_id) REFERENCES "User"(user_id)
 );
 
--- Таблица для заявок в организацию
+
 CREATE TABLE OrganizationRequests (
     request_id SERIAL PRIMARY KEY,
     user_id INT,
@@ -160,7 +160,7 @@ CREATE TABLE OrganizationRequests (
     FOREIGN KEY (organization_id) REFERENCES Organization(organization_id)
 );
 
--- 4. Добавляем внешние ключи через ALTER TABLE
+
 ALTER TABLE Positions
 ADD CONSTRAINT FK_Positions_Organization
 FOREIGN KEY (organization_id) REFERENCES Organization(organization_id);
@@ -221,23 +221,22 @@ ALTER TABLE Performers
 ADD CONSTRAINT FK_Performers_Tasks
 FOREIGN KEY (task_id) REFERENCES Tasks(task_id);
 
--- Добавление внешнего ключа в таблицу "Organization" для admin_id
+
 ALTER TABLE Organization
 ADD CONSTRAINT FK_Organization_User
 FOREIGN KEY (admin_id) REFERENCES "User"(user_id);
 
--- Добавление внешнего ключа в таблицу "Organization" для chat_id
+
 ALTER TABLE Organization
 ADD CONSTRAINT FK_Organization_Chat
 FOREIGN KEY (chat_id) REFERENCES Chat(chat_id);
 
--- Добавление внешнего ключа в таблицу "Chat" для last_message_id
+
 ALTER TABLE Chat
 ADD CONSTRAINT FK_Chat_LastMessage
 FOREIGN KEY (last_message_id) REFERENCES Messages(message_id);
 
--- 5. Создаем функции и триггеры
--- Function to validate email format
+
 CREATE OR REPLACE FUNCTION validate_email() 
 RETURNS TRIGGER AS $$
 BEGIN
@@ -248,13 +247,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Trigger for email validation
+
 CREATE TRIGGER validate_email_trigger
 BEFORE INSERT OR UPDATE ON "User"
 FOR EACH ROW
 EXECUTE FUNCTION validate_email();
 
--- Function for user registration
+
 CREATE OR REPLACE FUNCTION register_user(
     p_email VARCHAR,
     p_password VARCHAR,
@@ -265,12 +264,12 @@ CREATE OR REPLACE FUNCTION register_user(
 DECLARE
     v_user_id INTEGER;
 BEGIN
-    -- Check if email already exists
+
     IF EXISTS (SELECT 1 FROM "User" WHERE email = p_email) THEN
         RAISE EXCEPTION 'Email already registered';
     END IF;
 
-    -- Insert new user
+
     INSERT INTO "User" (
         email,
         password,
@@ -293,7 +292,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Function for user authentication
 CREATE OR REPLACE FUNCTION authenticate_user(
     p_email VARCHAR,
     p_password VARCHAR
@@ -317,7 +315,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Trigger to update last_login timestamp
+
 CREATE OR REPLACE FUNCTION update_last_login()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -332,7 +330,6 @@ FOR EACH ROW
 WHEN (OLD.last_login IS DISTINCT FROM NEW.last_login)
 EXECUTE FUNCTION update_last_login();
 
--- Функция поиска пользователей
 CREATE OR REPLACE FUNCTION search_users(search_query TEXT)
 RETURNS TABLE (
     user_id INT,
@@ -367,7 +364,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Функция поиска организаций
+
 CREATE OR REPLACE FUNCTION search_organizations(search_query TEXT)
 RETURNS TABLE (
     organization_id INT,
@@ -390,16 +387,16 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Function to validate task dates and create history record
+
 CREATE OR REPLACE FUNCTION validate_task_dates_and_track()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- Validate dates
+
     IF NEW.start_date >= NEW.finish_date THEN
         RAISE EXCEPTION 'Start date must be before finish date';
     END IF;
 
-    -- Track changes for existing tasks
+
     IF TG_OP = 'UPDATE' THEN
         INSERT INTO TaskHistory (
             task_id,
@@ -421,13 +418,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Trigger for task validation and tracking
+
 CREATE TRIGGER task_validation_and_tracking
 BEFORE INSERT OR UPDATE ON Tasks
 FOR EACH ROW
 EXECUTE FUNCTION validate_task_dates_and_track();
 
--- Function to create a new task with subtasks and performers
+
 CREATE OR REPLACE FUNCTION create_task(
     p_organization_id INT,
     p_title VARCHAR,
@@ -438,14 +435,14 @@ CREATE OR REPLACE FUNCTION create_task(
     p_priority VARCHAR,
     p_reward_points INT,
     p_performers INT[],
-    p_subtasks jsonb[] -- Array of objects with title and description
+    p_subtasks jsonb[] 
 ) RETURNS INT AS $$
 DECLARE
     v_task_id INT;
     v_performer INT;
     v_subtask jsonb;
 BEGIN
-    -- Create main task
+
     INSERT INTO Tasks (
         organization_id,
         task_title,
@@ -468,13 +465,12 @@ BEGIN
         p_reward_points
     ) RETURNING task_id INTO v_task_id;
 
-    -- Add performers
     FOREACH v_performer IN ARRAY p_performers LOOP
         INSERT INTO Performers (performer_id, task_id)
         VALUES (v_performer, v_task_id);
     END LOOP;
 
-    -- Add subtasks
+
     FOREACH v_subtask IN ARRAY p_subtasks LOOP
         INSERT INTO Subtasks (task_id, title, description)
         VALUES (
@@ -488,7 +484,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Добавление таблицы участников чата
 CREATE TABLE ChatMembers (
     member_id SERIAL PRIMARY KEY,
     chat_id INT,
@@ -498,11 +493,11 @@ CREATE TABLE ChatMembers (
     FOREIGN KEY (user_id) REFERENCES "User"(user_id) ON DELETE CASCADE
 );
 
--- Создание уникального ограничения, чтобы предотвратить дубликаты участников
+
 ALTER TABLE ChatMembers
 ADD CONSTRAINT unique_chat_member UNIQUE (chat_id, user_id);
 
--- Таблица для изображений в сообщениях
+
 CREATE TABLE MessageImages (
     image_id SERIAL PRIMARY KEY,
     chat_id INT,

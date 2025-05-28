@@ -33,6 +33,9 @@ const ParticipantsOrganizationScreen = ({ navigation }: any) => {
         if (response.data.success) {
           setParticipants(response.data.participants);
         }
+      } else {
+        // Если нет organization_id, устанавливаем пустой массив участников
+        setParticipants([]);
       }
     } catch (error) {
       console.error('Error loading participants:', error);

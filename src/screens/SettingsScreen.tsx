@@ -66,7 +66,7 @@ const SettingsScreen = ({navigation}: any) => {
         await AsyncStorage.setItem('userToken', JSON.stringify(updatedUserData));
         Alert.alert('Успех', 'Данные успешно обновлены');
 
-        // Clear password fields
+
         setFormData(prev => ({
           ...prev,
           current_password: '',

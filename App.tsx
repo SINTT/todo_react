@@ -15,6 +15,8 @@ import ParticipantsOrganizationScreen from './src/screens/ParticipantsOrganizati
 import TaskScreen from './src/screens/TaskScreen';
 import ChatScreen from './src/screens/ChatScreen';
 import NotificationsScreen from './src/screens/NotificationsScreen';
+import AiChatScreen from './src/screens/AiChatScreen';
+import PostScreen from './src/screens/PostScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -36,6 +38,8 @@ function App(): React.JSX.Element {
         <Stack.Screen name="Task" component={TaskScreen} />
         <Stack.Screen name="ChatScreen" component={ChatScreen} />
         <Stack.Screen name="NotificationsScreen" component={NotificationsScreen} />
+        <Stack.Screen name="AiChatScreen" component={AiChatScreen} />
+        <Stack.Screen name="PostScreen" component={PostScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

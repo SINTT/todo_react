@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, TextInput, FlatList, View, Image, TouchableOpacity, StatusBar, Alert } from 'react-native';
 import { Text } from '../components/CustomText';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { api } from '../config/api'; // Ensure this is correctly configured
+import { api } from '../config/api'; 
 import { AxiosError } from 'axios';
 import * as ImagePicker from 'react-native-image-picker';
 import { ImageViewerModal } from '../components/ImageViewer';
@@ -37,7 +37,7 @@ interface ChatImage {
   created_at: string;
   sender_name: string;
   sender_id: number;
-  sender_image: string;  // Added missing property
+  sender_image: string; 
 }
 
 interface DraftImage {
@@ -55,7 +55,7 @@ interface ChatItem {
 
 const ChatScreen = ({ route, navigation }: any) => {
   const { chatId, userId, recipientName, recipientImage, isNewChat } = route.params;
-  const [messages, setMessages] = useState<Message[]>([]); // Define type for messages
+  const [messages, setMessages] = useState<Message[]>([]); 
   const [newMessage, setNewMessage] = useState('');
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [chatInfo, setChatInfo] = useState<ChatInfo | null>(null);
@@ -83,7 +83,7 @@ const ChatScreen = ({ route, navigation }: any) => {
       loadImages();
     }
 
-    // Only set up polling for existing chats
+   
     let interval: NodeJS.Timeout;
     if (!isNewChat) {
       interval = setInterval(loadMessages, 5000);
@@ -95,7 +95,7 @@ const ChatScreen = ({ route, navigation }: any) => {
   }, [chatId, isNewChat]);
 
   useEffect(() => {
-    // Combine and sort messages and images
+    // sort messages and img
     const items: ChatItem[] = [
       ...messages.map(msg => ({
         id: `msg_${msg.message_id}`,
@@ -207,7 +207,7 @@ const ChatScreen = ({ route, navigation }: any) => {
 
       if (newMessage.trim()) {
         if (isNewChat) {
-          // Create new direct chat
+          // Create new chat
           const response = await api.post('/api/chats/direct', {
             recipient_id: userId,
             sender_id: currentUserId,
@@ -216,14 +216,14 @@ const ChatScreen = ({ route, navigation }: any) => {
 
           if (response.data.success) {
             setCurrentChatId(response.data.chat_id);
-            // Update route params with new chatId
+          
             navigation.setParams({ 
               chatId: response.data.chat_id,
               isNewChat: false
             });
           }
         } else {
-          // Send message to existing chat
+          // Send message
           await api.post(`/api/chats/${chatId}/messages`, {
             message_text: newMessage,
             sender_id: currentUserId,
@@ -272,8 +272,14 @@ const ChatScreen = ({ route, navigation }: any) => {
           {!isMyMessage && (
             <Text semiBold style={styles.senderName}>{item.sender_name}</Text>
           )}
-          <Text style={styles.messageText}>{item.message_text}</Text>
-          <Text style={styles.messageTime}>
+          <Text style={[
+            styles.messageText,
+            isMyMessage && styles.myMessageText
+          ]}>{item.message_text}</Text>
+          <Text style={[
+            styles.messageTime,
+            isMyMessage && { color: '#ffffff99' }
+          ]}>
             {formatMessageTime(item.date)}
           </Text>
         </View>
@@ -325,7 +331,7 @@ const ChatScreen = ({ route, navigation }: any) => {
     }
   };
 
-  // Добавим функцию для получения информации о собеседнике
+  // для получения информации о собеседнике
   const getInterlocutorInfo = () => {
     if (!chatInfo || !currentUserId || chatInfo.is_group_chat) return null;
     return chatInfo.participants?.find(p => p.user_id !== currentUserId);
@@ -373,7 +379,7 @@ const ChatScreen = ({ route, navigation }: any) => {
         data={chatItems}
         renderItem={renderChatItem}
         keyExtractor={(item) => item.id}
-        inverted // Show the latest messages at the bottom
+        inverted 
       />
       
       <View>
@@ -394,7 +400,7 @@ const ChatScreen = ({ route, navigation }: any) => {
             </TouchableOpacity>
           </View>
         )}
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputContainer, draftImage && styles.inputContainerWithDraft]}>
           <TouchableOpacity 
             style={styles.attachButton} 
             onPress={handleImagePick}
@@ -405,28 +411,23 @@ const ChatScreen = ({ route, navigation }: any) => {
             />
           </TouchableOpacity>
           <TextInput
-            style={[
-              styles.input,
-              draftImage && styles.inputWithImage
-            ]}
+            style={[styles.input]}
             placeholder="Type a message..."
             value={newMessage}
             onChangeText={setNewMessage}
+            multiline
           />
           <TouchableOpacity 
             style={[
               styles.sendButton,
-              (!newMessage.trim() && !draftImage) && styles.sendButtonDisabled
+              (!newMessage.trim() && !draftImage) && { opacity: 0.5 }
             ]} 
             onPress={sendMessage}
             disabled={!newMessage.trim() && !draftImage}
           >
             <Image 
               source={require('../assets/icons/send.png')}
-              style={[
-                styles.sendIcon,
-                (!newMessage.trim() && !draftImage) && styles.sendIconDisabled
-              ]}
+              style={[styles.sendIcon]}
             />
           </TouchableOpacity>
         </View>
@@ -451,7 +452,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 10,
+    paddingHorizontal: 10, paddingLeft: 0,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
@@ -504,21 +505,30 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     maxWidth: '75%',
   },
-  myMessage: {
-    backgroundColor: '#c6dfff',
-    borderBottomRightRadius: 4,
-  },
   otherMessage: {
     backgroundColor: '#F0F0F0',
+    alignSelf: 'flex-start',
     borderBottomLeftRadius: 4,
   },
   senderName: {
     fontSize: 14,
+    color: '#000',
   },
   messageText: {
     fontSize: 16,
-    color: '#000',
     marginBottom: 4,
+  },
+  myMessage: {
+    backgroundColor: '#2B2B2B',
+    alignSelf: 'flex-end',
+    borderBottomRightRadius: 4,
+    color: '#ffffff',
+  },
+  myMessageText: {
+    color: '#ffffff',
+  },
+  otherMessageText: {
+    color: '#1a1a1a',
   },
   messageTime: {
     fontSize: 11,
@@ -527,33 +537,56 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     flexDirection: 'row',
-    padding: 10,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    gap: 10,
+    padding: 20,
+  },
+  inputContainerWithDraft: {
     borderTopWidth: 1,
-    borderTopColor: '#ccc',
-    backgroundColor: '#fff',
+    borderTopColor: '#e0e0e0',
   },
   input: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    fontSize: 16,
+    height: 56,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 50,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     maxHeight: 100,
+    fontSize: 16,
   },
   sendButton: {
-    marginLeft: 10,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#007AFF',
+    width: 56,
+    height: 56,
+    borderRadius: 50,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#2B2B2B',
   },
   sendIcon: {
     width: 24,
     height: 24,
     tintColor: '#fff',
+  },
+  attachButton: {
+    width: 34,
+    height: 34,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  attachIcon: {
+    width: 34,
+    height: 34,
+    tintColor: '#666',
+  },
+  messageBubble: {
+    marginVertical: 4,
+    padding: 12,
+    borderRadius: 16,
+    maxWidth: '80%',
+    alignSelf: 'flex-start',
   },
   bottomSafeArea: {
     height: 34, // Высота для учета навигационной панели Android
@@ -581,14 +614,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginVertical: 4,
   },
-  attachButton: {
-    padding: 10,
-  },
-  attachIcon: {
-    width: 24,
-    height: 24,
-    tintColor: '#666',
-  },
   draftImageContainer: {
     padding: 8,
     backgroundColor: '#f8f8f8',
@@ -615,9 +640,6 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     tintColor: '#fff',
-  },
-  inputWithImage: {
-    flex: 1,
   },
   sendButtonDisabled: {
     backgroundColor: '#ccc',

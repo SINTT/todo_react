@@ -4,12 +4,14 @@ import { Text } from '../components/CustomText';
 import { api } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import * as ImagePicker from 'react-native-image-picker';
 
 type RootStackParamList = {
   Main: undefined;
   OrganizationSettings: undefined;
   RequestionsOrganization: undefined;
   ParticipantsOrganization: undefined;
+  PostScreen: { organizationId: number }; // Добавляем тип для PostScreen
 };
 
 type OrganizationSettingsScreenProps = {
@@ -26,6 +28,9 @@ const OrganizationSettingsScreen = ({ navigation }: OrganizationSettingsScreenPr
     website: '',
   });
   const [userRole, setUserRole] = useState<string>('');
+  const [organizationImage, setOrganizationImage] = useState<string | null>(null);
+  const [imageLoading, setImageLoading] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     loadOrganizationData();
@@ -47,6 +52,7 @@ const OrganizationSettingsScreen = ({ navigation }: OrganizationSettingsScreenPr
             description: org.description || '',
             website: org.website || '',
           });
+          setOrganizationImage(org.organization_image);
 
           // Загрузка данных админа
           const adminResponse = await api.get(`/api/users/${org.admin_id}`);
@@ -142,6 +148,45 @@ const OrganizationSettingsScreen = ({ navigation }: OrganizationSettingsScreenPr
     );
   };
 
+  const handleImagePick = () => {
+    ImagePicker.launchImageLibrary(
+      {
+        mediaType: 'photo',
+        includeBase64: true,
+        quality: 0.8,
+        maxWidth: 1000,
+        maxHeight: 1000,
+      },
+      async response => {
+        if (response.didCancel || !response.assets?.[0].base64) {
+          return;
+        }
+
+        try {
+          setImageLoading(true);
+          setImageError(false);
+          const base64Image = `data:${response.assets[0].type};base64,${response.assets[0].base64}`;
+
+          const uploadResponse = await api.put(
+            `/api/organizations/${organization.organization_id}/organization-image`,
+            {image: base64Image},
+          );
+
+          if (uploadResponse.data.success) {
+            setOrganization(uploadResponse.data.organization);
+            setOrganizationImage(uploadResponse.data.organization_image);
+            Alert.alert('Успех', 'Логотип организации обновлен');
+          }
+        } catch (error: any) {
+          setImageError(true);
+          Alert.alert('Ошибка', error.response?.data?.error || 'Ошибка при обновлении фото');
+        } finally {
+          setImageLoading(false);
+        }
+      },
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.container}>
@@ -169,6 +214,24 @@ const OrganizationSettingsScreen = ({ navigation }: OrganizationSettingsScreenPr
       </View>
 
       <ScrollView style={styles.content}>
+        <View style={styles.imageContainer}>
+          <TouchableOpacity onPress={handleImagePick} disabled={imageLoading}>
+            {organization?.organization_image && !imageError ? (
+              <Image
+                source={{uri: organization.organization_image}}
+                style={styles.organizationImage}
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <View style={styles.imagePlaceholder}>
+                <Text style={styles.imagePlaceholderText}>
+                  {imageLoading ? 'Загрузка...' : 'Добавить логотип'}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+
         <View style={[styles.inputContainer, { marginBottom: 10 }]}>
           <TextInput
             style={styles.input}
@@ -179,14 +242,18 @@ const OrganizationSettingsScreen = ({ navigation }: OrganizationSettingsScreenPr
           <Text style={styles.label}>Название организации</Text>
         </View>
 
-        <View style={[styles.inputContainer, { marginBottom: 10 }]}>
+        <View style={[styles.inputContainer, { marginBottom: 10, height: 'auto', minHeight: 120 }]}>
           <TextInput
-            style={[styles.input, { paddingTop: 32 }]}
+            style={[styles.input, { 
+              height: 'auto',
+              minHeight: 120,
+              paddingTop: 32,
+              textAlignVertical: 'top'
+            }]}
             placeholder=""
             multiline
             value={formData.description}
             onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
-            textAlignVertical="top"
           />
           <Text style={styles.label}>Описание организации</Text>
         </View>
@@ -243,7 +310,21 @@ const OrganizationSettingsScreen = ({ navigation }: OrganizationSettingsScreenPr
             </Text>
           </TouchableOpacity>
         </View>
-   
+        
+        <TouchableOpacity
+          style={[styles.actionButton, { marginBottom: 10 }]}
+          onPress={() => {
+            if (organization?.organization_id) {
+              navigation.navigate('PostScreen', { 
+                organizationId: organization.organization_id 
+              });
+            }
+          }}
+        >
+          <Text semiBold style={styles.actionButtonText}>
+            Должности
+          </Text>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.saveButton, { marginBottom: 10 }]}
@@ -316,7 +397,7 @@ const styles = StyleSheet.create({
     gap: 10, // Добавляем gap для ScrollView
   },
   inputContainer: {
-    height: 56,
+    minHeight: 56,
     position: 'relative',
   },
   label: {
@@ -327,7 +408,7 @@ const styles = StyleSheet.create({
     color: '#666666',
   },
   input: {
-    height: 56,
+    minHeight: 56,
     borderWidth: 1,
     borderColor: '#E5E5E5',
     borderRadius: 16,
@@ -405,6 +486,29 @@ const styles = StyleSheet.create({
   },
   leaveButton: {
     backgroundColor: '#E1E9F0',
+  },
+  imageContainer: {
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  organizationImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+  },
+  imagePlaceholder: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#E5E5E5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imagePlaceholderText: {
+    color: '#666666',
+    fontSize: 14,
+    textAlign: 'center',
+    padding: 10,
   },
 });
 
